@@ -63,8 +63,13 @@ async function request(url: string, init?: { method?: string; body?: unknown }):
     authed.value = false
     throw new Error('Sign in required')
   }
-  if (!response.ok) throw new Error(await response.text())
-  return response.json() as Promise<Board>
+  const text = await response.text()
+  if (!response.ok) throw new Error(text.slice(0, 200) || `HTTP ${response.status}`)
+  try {
+    return JSON.parse(text) as Board
+  } catch {
+    throw new Error(text.slice(0, 200) || 'Invalid JSON from API')
+  }
 }
 
 async function commit(url: string, init?: { method?: string; body?: unknown }): Promise<Board> {
@@ -81,10 +86,22 @@ async function commit(url: string, init?: { method?: string; body?: unknown }): 
   }
 }
 
+async function readJsonSafe<T>(response: Response): Promise<T | null> {
+  const text = await response.text()
+  if (!text) return null
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error(text.slice(0, 200) || `HTTP ${response.status}`)
+  }
+}
+
 export async function hydrate(): Promise<void> {
   try {
-    const health = await fetch('/api/health').then((r) => r.json() as Promise<{ auth?: boolean }>)
-    authRequired.value = Boolean(health.auth)
+    const healthRes = await fetch('/api/health')
+    const health = await readJsonSafe<{ auth?: boolean; error?: string }>(healthRes)
+    if (!healthRes.ok) throw new Error(health?.error || `Health check failed (${healthRes.status})`)
+    authRequired.value = Boolean(health?.auth)
     apply(await request('/api/board'))
     ready.value = true
     authed.value = true

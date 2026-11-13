@@ -1,26 +1,38 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import type { Board } from '../src/types.ts'
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-export const dataFile = path.join(root, 'data', 'board.json')
+/** Avoid import.meta — Vercel may bundle API as CJS and crash every function on load. */
+export const dataFile = process.env.RHINO_DATA_FILE ?? path.join(process.cwd(), 'data', 'board.json')
 
 const BOARD_KEY = 'rhino:board'
 
 export type StoreKind = 'file' | 'redis'
 
+function redisCreds(): { url: string; token: string } | null {
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN
+  if (!url || !token) return null
+  return { url, token }
+}
+
 export function storeKind(): StoreKind {
-  const raw = (process.env.RHINO_STORE ?? 'file').toLowerCase()
-  return raw === 'redis' ? 'redis' : 'file'
+  const raw = (process.env.RHINO_STORE ?? '').toLowerCase()
+  if (raw === 'file') return 'file'
+  if (raw === 'redis') return 'redis'
+  // Vercel + Upstash Marketplace: use Redis whenever credentials exist
+  return redisCreds() ? 'redis' : 'file'
 }
 
 async function redis() {
-  const url = process.env.UPSTASH_REDIS_REST_URL
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN
-  if (!url || !token) throw new Error('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required for redis store.')
+  const creds = redisCreds()
+  if (!creds) {
+    throw new Error(
+      'Redis store needs UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN (or KV_REST_API_URL + KV_REST_API_TOKEN).',
+    )
+  }
   const { Redis } = await import('@upstash/redis')
-  return new Redis({ url, token })
+  return new Redis(creds)
 }
 
 export async function loadRawBoard(): Promise<Board | null> {

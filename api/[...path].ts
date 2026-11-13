@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { Readable } from 'node:stream'
-import { handleApi } from '../server/handle.ts'
+import { handleApi } from '../server/handle'
 
 export const config = {
   api: {
@@ -24,11 +24,20 @@ function asIncoming(req: VercelRequest): VercelRequest {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  process.env.RHINO_STORE ??= 'redis'
-  const handled = await handleApi(asIncoming(req), res)
-  if (!handled) {
-    res.statusCode = 404
-    res.setHeader('content-type', 'text/plain; charset=utf-8')
-    res.end('Not found')
+  try {
+    const handled = await handleApi(asIncoming(req), res)
+    if (!handled) {
+      res.statusCode = 404
+      res.setHeader('content-type', 'application/json; charset=utf-8')
+      res.end(JSON.stringify({ error: 'Not found' }))
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Request failed'
+    console.error('[rhino api]', error)
+    if (!res.headersSent) {
+      res.statusCode = 500
+      res.setHeader('content-type', 'application/json; charset=utf-8')
+      res.end(JSON.stringify({ error: message }))
+    }
   }
 }
