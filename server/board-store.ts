@@ -10,8 +10,15 @@ const BOARD_KEY = 'rhino:board'
 export type StoreKind = 'file' | 'redis'
 
 function redisCreds(): { url: string; token: string } | null {
-  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN
+  // Prefer Marketplace prefix (e.g. RHINO_KV_*) then stock Upstash / Vercel KV names
+  const url =
+    process.env.RHINO_KV_REST_API_URL ||
+    process.env.UPSTASH_REDIS_REST_URL ||
+    process.env.KV_REST_API_URL
+  const token =
+    process.env.RHINO_KV_REST_API_TOKEN ||
+    process.env.UPSTASH_REDIS_REST_TOKEN ||
+    process.env.KV_REST_API_TOKEN
   if (!url || !token) return null
   return { url, token }
 }

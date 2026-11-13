@@ -1,12 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { Readable } from 'node:stream'
-import { handleApi } from '../server/handle'
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
+import { handleApi } from './handle.ts'
 
 /** Ensure a readable body stream when Vercel has already buffered JSON. */
 function asIncoming(req: VercelRequest): VercelRequest {
