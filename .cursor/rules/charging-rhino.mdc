@@ -1,24 +1,50 @@
 ---
-description: Read and write Charging Rhino todos via API (no local todo file)
+description: Read and write Charging Rhino todos via hosted API (no local todo file)
 alwaysApply: true
 ---
 
 # Charging Rhino
 
-This app owns its own work list at `http://127.0.0.1:4747`. **Project key:** `charging-rhino`.
+Todos for this project live in Charging Rhino at `https://charging-rhino.vercel.app`, not in this repo.
 
-You do **not** need the user to say “Rhino.” If they ask to list, add, track, change, or finish a todo — call the API. Never store Rhino todos only in markdown.
+**Base URL:** `https://charging-rhino.vercel.app`  
+**Project key:** `charging-rhino`  
+**Auth:** `-H "Authorization: Bearer $RHINO_PASSWORD"` (same password as the Rhino sign-in).
+
+You do **not** need the user to say “Rhino.” If they ask to list, add, track, change, or finish a todo — call the API. Never write todos into `TODO.md` or `charging-rhino.json` for Rhino.
+
+## Endpoints
 
 ```bash
-curl -s 'http://127.0.0.1:4747/api/projects/charging-rhino/tasks?open=1'
+# List open
+curl -s 'https://charging-rhino.vercel.app/api/projects/charging-rhino/tasks?open=1' \
+  -H "Authorization: Bearer $RHINO_PASSWORD"
 
-curl -s -X POST 'http://127.0.0.1:4747/api/projects/charging-rhino/tasks' \
+# Add
+curl -s -X POST 'https://charging-rhino.vercel.app/api/projects/charging-rhino/tasks' \
   -H 'content-type: application/json' \
+  -H "Authorization: Bearer $RHINO_PASSWORD" \
   -d '{"title":"Short action title","note":"Optional context","lane":"next"}'
 
-curl -s -X PATCH 'http://127.0.0.1:4747/api/tasks/TASK_ID' \
+# Start work (optional startRef = commit or URL)
+curl -s -X PATCH 'https://charging-rhino.vercel.app/api/tasks/TASK_ID' \
   -H 'content-type: application/json' \
-  -d '{"status":"done"}'
+  -H "Authorization: Bearer $RHINO_PASSWORD" \
+  -d '{"status":"in_progress","startRef":""}'
+
+# Complete — ONLY after the user explicitly approves
+curl -s -X PATCH 'https://charging-rhino.vercel.app/api/tasks/TASK_ID' \
+  -H 'content-type: application/json' \
+  -H "Authorization: Bearer $RHINO_PASSWORD" \
+  -d '{"status":"done","doneRef":""}'
 ```
 
-Status: `open` | `in_progress` | `done`. Optional `startRef` / `doneRef` on PATCH. Mark complete only when the user explicitly approves.
+Status: `open` | `in_progress` | `done`. Lanes: `now` | `next` | `later`.
+
+## Completing work
+
+Set `status` to `done` only when the user clearly approves. Do not invent completions.
+
+## Optional metadata
+
+Root `charging-rhino.json` may hold `name`, `summary`, and `tags` only — never a `tasks` array.

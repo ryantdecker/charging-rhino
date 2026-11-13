@@ -8,17 +8,17 @@ Projects may keep a root `charging-rhino.json` for humans (name, summary, tags).
 
 ## Agent API
 
-**Local:** [http://127.0.0.1:4747](http://127.0.0.1:4747)  
-**Hosted:** your Vercel URL (same paths)
+**Hosted:** [https://charging-rhino.vercel.app](https://charging-rhino.vercel.app)  
+**Local:** [http://127.0.0.1:4747](http://127.0.0.1:4747) (optional)
 
-If `RHINO_PASSWORD` is set, send `Authorization: Bearer <password>` (or Basic with any username).
+Send `Authorization: Bearer <RHINO_PASSWORD>` (same password as the UI).
 
 Resolve a project by path key (`disc-golf-guru`), id (`dgg`), or exact name.
 
 ### List open tasks
 
 ```bash
-curl -s 'http://127.0.0.1:4747/api/projects/disc-golf-guru/tasks?open=1' \
+curl -s 'https://charging-rhino.vercel.app/api/projects/disc-golf-guru/tasks?open=1' \
   -H "Authorization: Bearer $RHINO_PASSWORD"
 ```
 
@@ -27,7 +27,7 @@ Returns `{ project, tasks }` where each task includes `id`, `title`, `note`, `la
 ### Add a task
 
 ```bash
-curl -s -X POST 'http://127.0.0.1:4747/api/projects/disc-golf-guru/tasks' \
+curl -s -X POST 'https://charging-rhino.vercel.app/api/projects/disc-golf-guru/tasks' \
   -H 'content-type: application/json' \
   -H "Authorization: Bearer $RHINO_PASSWORD" \
   -d '{"title":"Smoke live scorecard on mobile","note":"Safari + Chrome","lane":"next"}'
@@ -42,14 +42,14 @@ Workflow: `open` → `in_progress` → `done`. Optional `startRef` / `doneRef` (
 Only mark `done` when the user explicitly approves.
 
 ```bash
-curl -s -X PATCH "http://127.0.0.1:4747/api/tasks/<task-id>" \
+curl -s -X PATCH "https://charging-rhino.vercel.app/api/tasks/<task-id>" \
   -H 'content-type: application/json' \
   -H "Authorization: Bearer $RHINO_PASSWORD" \
   -d '{"status":"in_progress","startRef":"https://github.com/org/repo/commit/abc"}'
 ```
 
 ```bash
-curl -s -X PATCH "http://127.0.0.1:4747/api/tasks/<task-id>" \
+curl -s -X PATCH "https://charging-rhino.vercel.app/api/tasks/<task-id>" \
   -H 'content-type: application/json' \
   -H "Authorization: Bearer $RHINO_PASSWORD" \
   -d '{"status":"done","doneRef":"abc123"}'
@@ -60,10 +60,16 @@ Also accepts `title`, `note`, `lane`, and `assist` (1–10). Legacy `{"done":tru
 ### Clear all tasks for a project
 
 ```bash
-curl -s -X DELETE 'http://127.0.0.1:4747/api/projects/dg-tour-app/tasks' \
+curl -s -X DELETE 'https://charging-rhino.vercel.app/api/projects/dg-tour-app/tasks' \
   -H "Authorization: Bearer $RHINO_PASSWORD"
+```
+
+### Replace the whole board (migration)
+
+```bash
+RHINO_PASSWORD='…' npm run push-board
 ```
 
 ## Cursor rule
 
-Copy [`examples/charging-rhino.mdc`](../examples/charging-rhino.mdc) to `.cursor/rules/charging-rhino.mdc` and set the project key. Point the base URL at localhost or the hosted app.
+Copy [`examples/charging-rhino.mdc`](../examples/charging-rhino.mdc) to `.cursor/rules/charging-rhino.mdc` and set the project key. Point agents at the hosted URL + Bearer password.
