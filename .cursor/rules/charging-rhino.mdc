@@ -1,0 +1,24 @@
+---
+description: Read and write Charging Rhino todos via API (no local todo file)
+alwaysApply: true
+---
+
+# Charging Rhino
+
+This app owns its own work list at `http://127.0.0.1:4747`. **Project key:** `charging-rhino`.
+
+You do **not** need the user to say “Rhino.” If they ask to list, add, track, change, or finish a todo — call the API. Never store Rhino todos only in markdown.
+
+```bash
+curl -s 'http://127.0.0.1:4747/api/projects/charging-rhino/tasks?open=1'
+
+curl -s -X POST 'http://127.0.0.1:4747/api/projects/charging-rhino/tasks' \
+  -H 'content-type: application/json' \
+  -d '{"title":"Short action title","note":"Optional context","lane":"next"}'
+
+curl -s -X PATCH 'http://127.0.0.1:4747/api/tasks/TASK_ID' \
+  -H 'content-type: application/json' \
+  -d '{"status":"done"}'
+```
+
+Status: `open` | `in_progress` | `done`. Optional `startRef` / `doneRef` on PATCH. Mark complete only when the user explicitly approves.

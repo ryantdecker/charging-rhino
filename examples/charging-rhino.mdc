@@ -1,0 +1,50 @@
+---
+description: Read and write Charging Rhino todos via API (no local todo file)
+alwaysApply: true
+---
+
+# Charging Rhino
+
+Todos for this project live in Charging Rhino, not in this repo.
+
+**Base URL:** `http://127.0.0.1:4747` locally, or the hosted Rhino URL.  
+**Project key:** replace `PROJECT_KEY` with this folder’s name (e.g. `disc-golf-guru`).  
+**Auth:** if required, add `-H "Authorization: Bearer $RHINO_PASSWORD"`.
+
+You do **not** need the user to say “Rhino.” If they ask to list, add, track, change, or finish a todo — call the API. Never write todos into `TODO.md` or `charging-rhino.json` for Rhino.
+
+## Endpoints
+
+```bash
+# List open
+curl -s 'BASE/api/projects/PROJECT_KEY/tasks?open=1' \
+  -H "Authorization: Bearer $RHINO_PASSWORD"
+
+# Add
+curl -s -X POST 'BASE/api/projects/PROJECT_KEY/tasks' \
+  -H 'content-type: application/json' \
+  -H "Authorization: Bearer $RHINO_PASSWORD" \
+  -d '{"title":"Short action title","note":"Optional context","lane":"next"}'
+
+# Start work (optional startRef = commit or URL)
+curl -s -X PATCH 'BASE/api/tasks/TASK_ID' \
+  -H 'content-type: application/json' \
+  -H "Authorization: Bearer $RHINO_PASSWORD" \
+  -d '{"status":"in_progress","startRef":""}'
+
+# Complete — ONLY after the user explicitly approves
+curl -s -X PATCH 'BASE/api/tasks/TASK_ID' \
+  -H 'content-type: application/json' \
+  -H "Authorization: Bearer $RHINO_PASSWORD" \
+  -d '{"status":"done","doneRef":""}'
+```
+
+Status: `open` | `in_progress` | `done`. Lanes: `now` | `next` | `later`.
+
+## Completing work
+
+Set `status` to `done` only when the user clearly approves. Do not invent completions.
+
+## Optional metadata
+
+Root `charging-rhino.json` may hold `name`, `summary`, and `tags` only — never a `tasks` array.
