@@ -266,9 +266,24 @@ button { cursor: pointer; }
 .icon-btn:disabled { opacity: 0.35; cursor: default; }
 
 .main {
-  width: min(1100px, 100%);
+  width: 100%;
   margin: 0;
-  padding: 32px 36px 64px;
+  padding: 0 0 64px;
+}
+.main > :not(.day-banner) {
+  padding-inline: 36px;
+}
+.day-banner {
+  margin: 0 0 22px;
+  overflow: hidden;
+  background: #1a3a6b;
+  line-height: 0;
+}
+.day-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+  animation: splash-fade 0.55s ease both;
 }
 .kicker {
   margin: 0 0 6px;
@@ -301,12 +316,10 @@ h2.display {
 }
 .hero-band {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 150px;
-  gap: 16px;
-  align-items: center;
+  gap: 4px;
+  padding-top: 8px;
 }
 .hero-band .lede { margin-bottom: 0; }
-.hero-band img { width: 132px; height: 132px; border-radius: 28px; justify-self: end; }
 .week-card {
   margin: 18px 0;
   padding: 16px 18px;
@@ -576,15 +589,210 @@ h2.display {
   margin-bottom: 14px;
 }
 .banner { background: #f8e6df; color: #8d2f12; }
-.login-card {
-  max-width: 420px;
-  margin: 12vh auto;
-  padding: 28px 24px;
-  background: color-mix(in srgb, var(--paper) 88%, white);
-  border-radius: 18px;
-  box-shadow: 0 18px 40px color-mix(in srgb, var(--ink) 12%, transparent);
-}
 .notice { background: var(--moss-soft); color: var(--moss); }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.splash {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #1a3a6b;
+  color: var(--ink);
+}
+.splash-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  animation: splash-rise 1.1s ease-out both;
+}
+.splash-brand {
+  position: absolute;
+  z-index: 3;
+  top: clamp(18px, 3vw, 32px);
+  left: clamp(18px, 3vw, 36px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: splash-fade 0.7s ease 0.15s both;
+}
+.splash-mark {
+  height: clamp(48px, 7vw, 72px);
+  width: auto;
+  filter: drop-shadow(0 6px 18px rgba(35, 51, 77, 0.28));
+}
+.splash-wordmark {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  font-weight: 800;
+  font-size: clamp(0.95rem, 2.2vw, 1.35rem);
+  line-height: 0.95;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #ff8a00;
+  text-shadow: 0 2px 12px rgba(26, 58, 107, 0.35);
+}
+.splash-hotspot {
+  position: absolute;
+  z-index: 4;
+  left: 58%;
+  top: 52%;
+  width: 28%;
+  height: 36%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 40% 45% 35% 40%;
+}
+.splash-hotspot:focus-visible {
+  outline: 3px solid #ff8a00;
+  outline-offset: 4px;
+}
+.splash-hotspot:hover {
+  background: radial-gradient(circle at 50% 55%, rgba(255, 138, 0, 0.14), transparent 68%);
+}
+.splash-hint {
+  position: absolute;
+  z-index: 3;
+  left: clamp(18px, 4vw, 48px);
+  bottom: clamp(22px, 5vh, 48px);
+  margin: 0;
+  max-width: 14rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(35, 51, 77, 0.55);
+  animation: splash-pulse 2.4s ease-in-out infinite;
+}
+.splash-panel {
+  position: absolute;
+  z-index: 5;
+  left: clamp(16px, 4vw, 48px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(100% - 32px, 360px);
+  padding: 28px 24px 24px;
+  background: color-mix(in srgb, #ede6da 92%, white);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(35, 51, 77, 0.28);
+  animation: splash-panel-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.splash-kicker {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.splash-title {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+.splash-lede {
+  margin: 8px 0 18px;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+.splash-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.splash-field input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fff;
+}
+.splash-submit {
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: #ff8a00;
+  color: #fff;
+  font-weight: 700;
+}
+.splash-submit:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.splash-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8e6df;
+  color: #8d2f12;
+  font-size: 0.9rem;
+}
+
+@keyframes splash-rise {
+  from { transform: scale(1.04); opacity: 0.7; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes splash-fade {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes splash-panel-in {
+  from { opacity: 0; transform: translate(-12px, -50%); }
+  to { opacity: 1; transform: translateY(-50%); }
+}
+@keyframes splash-pulse {
+  0%, 100% { opacity: 0.78; }
+  50% { opacity: 1; }
+}
+
+@media (max-width: 720px) {
+  .splash-hotspot {
+    left: 48%;
+    top: 48%;
+    width: 46%;
+    height: 38%;
+  }
+  .splash-panel {
+    left: 50%;
+    top: auto;
+    bottom: 16px;
+    transform: translateX(-50%);
+    width: min(100% - 24px, 400px);
+    animation-name: splash-panel-up;
+  }
+  .splash-hint {
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    bottom: 18px;
+  }
+  .splash-open .splash-hint { display: none; }
+}
+
+@keyframes splash-panel-up {
+  from { opacity: 0; transform: translate(-50%, 16px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
 
 .adder form { flex-wrap: wrap; }
 .notes-block { margin: 8px 0 22px; }
@@ -793,8 +1001,8 @@ h2.display {
 
 @media (max-width: 980px) {
   .shell.with-side { grid-template-columns: 1fr; }
-  .hero-band, .stat-row { grid-template-columns: 1fr; }
-  .hero-band img { display: none; }
+  .stat-row { grid-template-columns: 1fr; }
+  .main > :not(.day-banner) { padding-inline: 16px; }
   .side {
     position: sticky;
     top: 0;

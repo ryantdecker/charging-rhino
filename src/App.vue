@@ -2,10 +2,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import CalendarView from './CalendarView.vue'
 import CaptureSheet from './CaptureSheet.vue'
+import DayBanner from './DayBanner.vue'
 import GoalsView from './GoalsView.vue'
 import ProgressView from './ProgressView.vue'
 import SettingsView from './SettingsView.vue'
+import SplashLogin from './SplashLogin.vue'
 import TaskView from './TaskView.vue'
+import { currentDayPart, greetingFor, watchDayPart } from './dayPart'
 import {
   addProject,
   addTask,
@@ -50,9 +53,12 @@ const view = ref<'home' | 'tasks' | 'goals' | 'calendar' | 'progress' | 'setting
 const horizon = ref<Horizon>('month')
 const activeTags = ref<string[]>([])
 const tagDraft = ref('')
-const passwordDraft = ref('')
 const loginError = ref('')
 const loggingIn = ref(false)
+const previewSplash = ref(
+  typeof location !== 'undefined' && new URLSearchParams(location.search).has('splash'),
+)
+const showSplash = computed(() => previewSplash.value || (authRequired.value && !ready.value))
 let horizonSeeded = false
 const horizons = [
   { id: 'day' as const, label: 'Day' },
@@ -146,12 +152,7 @@ const rangePercent = computed(() => {
 
 const selected = computed(() => board.projects.find((project) => project.id === selectedId.value) ?? null)
 const showSide = computed(() => ready.value && !loadError.value)
-const greeting = computed(() => {
-  const hour = new Date().getHours()
-  if (hour < 12) return 'Good morning.'
-  if (hour < 17) return 'Good afternoon.'
-  return 'Good evening.'
-})
+const greeting = computed(() => greetingFor(currentDayPart.value))
 
 const lanes: Lane[] = ['now', 'next', 'later']
 
@@ -313,12 +314,11 @@ function onDrop(targetId: string) {
 }
 
 
-async function submitLogin() {
+async function submitLogin(password: string) {
   loggingIn.value = true
   loginError.value = ''
   try {
-    await login(passwordDraft.value)
-    passwordDraft.value = ''
+    await login(password)
     if (!horizonSeeded) {
       horizon.value = board.prefs.defaultHorizon
       horizonSeeded = true
@@ -331,7 +331,13 @@ async function submitLogin() {
   }
 }
 
+async function confirmSignOut() {
+  if (!window.confirm('Sign out of Charging Rhino?')) return
+  await logout()
+}
+
 onMounted(async () => {
+  watchDayPart()
   await hydrate()
   if (ready.value) {
     if (!horizonSeeded) {
@@ -376,7 +382,13 @@ function laneLabel(lane: Lane) {
 </script>
 
 <template>
-  <div class="shell" :class="{ 'with-side': showSide }">
+  <SplashLogin
+    v-if="showSplash"
+    :logging-in="loggingIn"
+    :error="loginError"
+    @submit="submitLogin"
+  />
+  <div v-else class="shell" :class="{ 'with-side': showSide }">
     <aside v-if="showSide" class="side">
       <div class="lockup">
         <img src="/mark-head.png" alt="" />
@@ -462,29 +474,25 @@ function laneLabel(lane: Lane) {
               <circle cx="12" cy="13" r="3.2" />
             </svg>
           </button>
+          <button
+            class="circle"
+            type="button"
+            aria-label="Sign out"
+            title="Sign out"
+            @click="confirmSignOut"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" />
+              <path d="M16 8l4 4-4 4M10 12h10" />
+            </svg>
+          </button>
         </div>
       </div>
     </aside>
 
     <main class="main">
-      <section v-if="authRequired && !ready" class="login-card" aria-labelledby="login-title">
-        <p class="kicker">Charging Rhino</p>
-        <h2 id="login-title" class="display">Sign in.</h2>
-        <p class="lede">Shared password for you and agents.</p>
-        <form class="composer adder" @submit.prevent="submitLogin">
-          <input
-            v-model="passwordDraft"
-            type="password"
-            autocomplete="current-password"
-            aria-label="Password"
-            placeholder="Password"
-            required
-          />
-          <button class="solid" type="submit" :disabled="loggingIn">{{ loggingIn ? 'Signing in…' : 'Sign in' }}</button>
-        </form>
-        <p v-if="loginError" class="banner">{{ loginError }}</p>
-      </section>
-      <p v-else-if="loadError" class="banner">{{ loadError }}</p>
+      <DayBanner v-if="ready && !loadError" />
+      <p v-if="loadError" class="banner">{{ loadError }}</p>
       <p v-else-if="!ready" class="lede">Loading the board…</p>
       <GoalsView v-else-if="view === 'goals'" />
       <CalendarView v-else-if="view === 'calendar'" />
@@ -498,7 +506,6 @@ function laneLabel(lane: Lane) {
             <p v-if="charge[0]?.top" class="lede">Next up is {{ charge[0].top.title }}.</p>
             <p v-else class="lede">The charge is clear.</p>
           </div>
-          <img src="/journey.png" alt="" />
         </div>
         <div class="filters">
           <div class="mode" role="group" aria-label="Time range">
@@ -651,7 +658,7 @@ function laneLabel(lane: Lane) {
         <div class="actions tool-row">
           <button class="texty" type="button" @click="capturing = true">From a photo</button>
           <button class="texty" type="button" @click="restore">Reset starter board</button>
-          <button v-if="authRequired || ready" class="texty" type="button" @click="logout">Sign out</button>
+          <button v-if="authRequired || ready" class="texty" type="button" @click="confirmSignOut">Sign out</button>
         </div>
       </section>
 
