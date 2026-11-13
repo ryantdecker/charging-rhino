@@ -137,6 +137,28 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       return true
     }
 
+    const body = method === 'GET' ? {} : await readJson(req)
+
+    if (method === 'PUT' && url.pathname === '/api/board') {
+      const incoming = body as Partial<Board> & { projects?: Board['projects']; tasks?: Board['tasks'] }
+      if (!Array.isArray(incoming.projects) || !Array.isArray(incoming.tasks)) {
+        throw new Error('Board replace needs projects and tasks arrays.')
+      }
+      send(
+        res,
+        200,
+        await updateBoard((board) => {
+          board.projects.splice(0, board.projects.length, ...incoming.projects!)
+          board.tasks.splice(0, board.tasks.length, ...incoming.tasks!)
+          board.goals.splice(0, board.goals.length, ...(Array.isArray(incoming.goals) ? incoming.goals : []))
+          if (incoming.prefs) board.prefs = structuredClone(incoming.prefs)
+          board.syncedAt = incoming.syncedAt ?? null
+          board.lastSync = incoming.lastSync ?? null
+        }),
+      )
+      return true
+    }
+
     if (method === 'POST' && url.pathname === '/api/reset') {
       send(
         res,
@@ -153,8 +175,6 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       )
       return true
     }
-
-    const body = method === 'GET' ? {} : await readJson(req)
 
     if (method === 'POST' && url.pathname === '/api/capture/apply') {
       send(

@@ -7,7 +7,8 @@
     "build": "vite build && node scripts/build-api.mjs",
     "build:api": "node scripts/build-api.mjs",
     "preview": "vite preview",
-    "board": "node --experimental-strip-types server/cli.ts"
+    "board": "node --experimental-strip-types server/cli.ts",
+    "push-board": "node scripts/push-board.mjs"
   },
   "dependencies": {
     "@upstash/redis": "^1.41.0",
