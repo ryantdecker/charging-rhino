@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { bannerSrc, currentDayPart, watchDayPart } from './dayPart'
+import { activeDayPart, bannerSrc, watchDayPart } from './dayPart'
 
 onMounted(() => watchDayPart())
 
-const src = computed(() => bannerSrc[currentDayPart.value])
+const src = computed(() => bannerSrc[activeDayPart.value])
 </script>
 
 <template>
-  <div class="day-banner" :data-part="currentDayPart" aria-hidden="true">
-    <img :src="src" :key="src" alt="" width="1024" height="220" />
+  <div class="day-banner" :data-part="activeDayPart" aria-hidden="true">
+    <img :src="src" :key="src" alt="" />
   </div>
 </template>

@@ -3,12 +3,13 @@ import { computed, onMounted, ref, watch } from 'vue'
 import CalendarView from './CalendarView.vue'
 import CaptureSheet from './CaptureSheet.vue'
 import DayBanner from './DayBanner.vue'
+import DayPreviewFab from './DayPreviewFab.vue'
 import GoalsView from './GoalsView.vue'
 import ProgressView from './ProgressView.vue'
 import SettingsView from './SettingsView.vue'
 import SplashLogin from './SplashLogin.vue'
 import TaskView from './TaskView.vue'
-import { currentDayPart, greetingFor, watchDayPart } from './dayPart'
+import { activeDayPart, greetingFor, watchDayPart } from './dayPart'
 import {
   addProject,
   addTask,
@@ -152,7 +153,7 @@ const rangePercent = computed(() => {
 
 const selected = computed(() => board.projects.find((project) => project.id === selectedId.value) ?? null)
 const showSide = computed(() => ready.value && !loadError.value)
-const greeting = computed(() => greetingFor(currentDayPart.value))
+const greeting = computed(() => greetingFor(activeDayPart.value))
 
 const lanes: Lane[] = ['now', 'next', 'later']
 
@@ -234,12 +235,12 @@ function onDragStart(id: string, event: DragEvent) {
   if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
 }
 
-function toggleTag(tag: string) {
-  const key = tag.toLowerCase()
-  activeTags.value = activeTags.value.some((item) => item.toLowerCase() === key)
-    ? activeTags.value.filter((item) => item.toLowerCase() !== key)
-    : [...activeTags.value, tag]
-}
+const tagFilter = computed({
+  get: () => chosenTags.value[0] ?? '',
+  set: (value: string) => {
+    activeTags.value = value ? [value] : []
+  },
+})
 
 function addTag() {
   const project = selected.value
@@ -492,6 +493,7 @@ function laneLabel(lane: Lane) {
 
     <main class="main">
       <DayBanner v-if="ready && !loadError" />
+      <DayPreviewFab v-if="ready && !loadError" />
       <p v-if="loadError" class="banner">{{ loadError }}</p>
       <p v-else-if="!ready" class="lede">Loading the board…</p>
       <GoalsView v-else-if="view === 'goals'" />
@@ -503,35 +505,24 @@ function laneLabel(lane: Lane) {
           <div>
             <p class="kicker">{{ today }}</p>
             <h2 id="charge-title" class="hello">{{ greeting }}</h2>
-            <p v-if="charge[0]?.top" class="lede">Next up is {{ charge[0].top.title }}.</p>
-            <p v-else class="lede">The charge is clear.</p>
           </div>
-        </div>
-        <div class="filters">
-          <div class="mode" role="group" aria-label="Time range">
-            <button
-              v-for="option in horizons"
-              :key="option.id"
-              type="button"
-              :aria-pressed="horizon === option.id"
-              @click="horizon = option.id"
-            >
-              {{ option.label }}
-            </button>
+          <div class="filters">
+            <label class="filter-field">
+              <span class="visually-hidden">Time range</span>
+              <select v-model="horizon" aria-label="Time range">
+                <option v-for="option in horizons" :key="option.id" :value="option.id">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+            <label class="filter-field">
+              <span class="visually-hidden">Project tag</span>
+              <select v-model="tagFilter" aria-label="Project tag">
+                <option value="">All tags</option>
+                <option v-for="tag in allTags" :key="tag" :value="tag">{{ tag }}</option>
+              </select>
+            </label>
           </div>
-          <div class="mode" role="group" aria-label="Project tags">
-            <button type="button" :aria-pressed="chosenTags.length === 0" @click="activeTags = []">All</button>
-            <button
-              v-for="tag in allTags"
-              :key="tag"
-              type="button"
-              :aria-pressed="chosenTags.some((item) => item.toLowerCase() === tag.toLowerCase())"
-              @click="toggleTag(tag)"
-            >
-              {{ tag }}
-            </button>
-          </div>
-          <p class="meta">Day is the Now lane. Week adds Next. Month is the whole charge. Tags match any selected tag.</p>
         </div>
         <article class="week-card">
           <div>
