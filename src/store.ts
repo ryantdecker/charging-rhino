@@ -297,6 +297,13 @@ export function setProjectTags(id: string, tags: string[]): void {
   void commit(`/api/projects/${id}`, { method: 'PATCH', body: { tags } })
 }
 
+export function setProjectLiveUrl(id: string, liveUrl: string | null): void {
+  const project = board.projects.find((item) => item.id === id)
+  const cleaned = liveUrl?.trim() ? liveUrl.trim() : null
+  if (project) project.liveUrl = cleaned
+  void commit(`/api/projects/${id}`, { method: 'PATCH', body: { liveUrl: cleaned ?? '' } })
+}
+
 export function saveSettings(body: {
   defaultHorizon?: Horizon
   addTag?: string

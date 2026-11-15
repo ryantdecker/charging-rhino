@@ -21,6 +21,8 @@ export interface Project {
   todoFile?: string | null
   notes?: string
   tags?: string[]
+  /** Optional link to the live / production app */
+  liveUrl?: string | null
 }
 
 export interface Task {

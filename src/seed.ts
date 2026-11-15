@@ -50,6 +50,7 @@ const projects: Project[] = [
     lastTouched: '2026-11-11',
     chargeRank: 0,
     status: 'open',
+    liveUrl: 'https://www.discgolf.guru',
   },
   {
     id: 'service-flow',
@@ -60,6 +61,7 @@ const projects: Project[] = [
     lastTouched: '2026-11-09',
     chargeRank: 1,
     status: 'open',
+    liveUrl: 'https://service-flow-hub.vercel.app',
   },
   {
     id: 'dg-tour',
@@ -80,6 +82,7 @@ const projects: Project[] = [
     lastTouched: '2026-11-06',
     chargeRank: 3,
     status: 'open',
+    liveUrl: 'https://pdga-asia-tour.vercel.app',
   },
   {
     id: 'pdga-api',
@@ -100,6 +103,7 @@ const projects: Project[] = [
     lastTouched: '2026-10-25',
     chargeRank: 5,
     status: 'open',
+    liveUrl: 'https://jbqguru.com',
   },
   {
     id: 'sahodar',
@@ -110,6 +114,7 @@ const projects: Project[] = [
     lastTouched: '2026-09-25',
     chargeRank: 6,
     status: 'open',
+    liveUrl: 'https://sahodarusa.org',
   },
   {
     id: 'sgu',
@@ -120,6 +125,7 @@ const projects: Project[] = [
     lastTouched: '2026-09-08',
     chargeRank: 7,
     status: 'open',
+    liveUrl: 'https://www.sgu.edu',
   },
   {
     id: 'charging-rhino',
@@ -130,6 +136,7 @@ const projects: Project[] = [
     lastTouched: seededOn,
     chargeRank: 8,
     status: 'open',
+    liveUrl: 'https://charging-rhino.vercel.app',
   },
 ]
 

@@ -25,6 +25,7 @@ import {
   ready,
   resetBoard,
   saveNotes,
+  setProjectLiveUrl,
   setProjectStatus,
   setProjectTags,
   setTaskStatus,
@@ -57,6 +58,7 @@ const narrowScreen = ref(
 const horizon = ref<Horizon>('month')
 const activeTags = ref<string[]>([])
 const tagDraft = ref('')
+const liveUrlDraft = ref('')
 const loginError = ref('')
 const loggingIn = ref(false)
 const previewSplash = ref(
@@ -284,6 +286,17 @@ function removeTag(tag: string) {
     (project.tags ?? []).filter((item) => item.toLowerCase() !== tag.toLowerCase()),
   )
 }
+
+function saveLiveUrl() {
+  const project = selected.value
+  if (!project) return
+  setProjectLiveUrl(project.id, liveUrlDraft.value.trim() || null)
+  liveUrlDraft.value = project.liveUrl ?? ''
+}
+
+watch(selected, (project) => {
+  liveUrlDraft.value = project?.liveUrl ?? ''
+})
 
 function onTaskDragStart(id: string, event: DragEvent) {
   const origin = event.target as HTMLElement | null
@@ -696,9 +709,22 @@ function laneLabel(lane: Lane) {
           <article v-for="project in openProjects()" :key="project.id" class="row">
             <div class="who">
               <strong>{{ project.name }}</strong>
-              <p class="meta">{{ openCount(project.id) }} open · {{ project.branch ?? 'no branch' }}<template v-if="project.tags?.length"> · {{ project.tags.join(', ') }}</template></p>
+              <p class="meta">
+                {{ openCount(project.id) }} open · {{ project.branch ?? 'no branch' }}
+                <template v-if="project.tags?.length"> · {{ project.tags.join(', ') }}</template>
+                <template v-if="project.liveUrl"> · live</template>
+              </p>
             </div>
-            <button class="texty" type="button" @click="selectProject(project.id)">Open</button>
+            <div class="actions">
+              <a
+                v-if="project.liveUrl"
+                class="texty"
+                :href="project.liveUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+              >Live</a>
+              <button class="texty" type="button" @click="selectProject(project.id)">Open</button>
+            </div>
           </article>
           <article v-for="project in shelvedProjects()" :key="project.id" class="row">
             <div class="who">
@@ -727,6 +753,17 @@ function laneLabel(lane: Lane) {
               <template v-if="selected.branch"> · {{ selected.branch }}</template>
               <template v-if="selected.lastTouched"> · touched {{ touched(selected.lastTouched) }}</template>
             </p>
+            <p v-if="selected.liveUrl" class="meta">
+              <a class="live-link" :href="selected.liveUrl" target="_blank" rel="noopener noreferrer">Open live app</a>
+            </p>
+            <form class="live-url-editor" @submit.prevent="saveLiveUrl">
+              <input
+                v-model="liveUrlDraft"
+                aria-label="Live app URL"
+                placeholder="Live app URL (optional)"
+              />
+              <button class="texty" type="submit">Save link</button>
+            </form>
             <form class="tag-editor" @submit.prevent="addTag">
               <span v-for="tag in selected.tags ?? []" :key="tag" class="chip tag">
                 {{ tag }}
@@ -737,6 +774,15 @@ function laneLabel(lane: Lane) {
             </form>
           </div>
           <div class="actions">
+            <a
+              v-if="selected.liveUrl"
+              class="solid"
+              :href="selected.liveUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Live app
+            </a>
             <button
               v-if="selected.status === 'open'"
               class="texty"

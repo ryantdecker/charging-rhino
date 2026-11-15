@@ -6544,7 +6544,8 @@ var projects = [
     branch: "main",
     lastTouched: "2026-11-11",
     chargeRank: 0,
-    status: "open"
+    status: "open",
+    liveUrl: "https://www.discgolf.guru"
   },
   {
     id: "service-flow",
@@ -6554,7 +6555,8 @@ var projects = [
     branch: "main",
     lastTouched: "2026-11-09",
     chargeRank: 1,
-    status: "open"
+    status: "open",
+    liveUrl: "https://service-flow-hub.vercel.app"
   },
   {
     id: "dg-tour",
@@ -6574,7 +6576,8 @@ var projects = [
     branch: "feature/single-tour-asia",
     lastTouched: "2026-11-06",
     chargeRank: 3,
-    status: "open"
+    status: "open",
+    liveUrl: "https://pdga-asia-tour.vercel.app"
   },
   {
     id: "pdga-api",
@@ -6594,7 +6597,8 @@ var projects = [
     branch: "main",
     lastTouched: "2026-10-25",
     chargeRank: 5,
-    status: "open"
+    status: "open",
+    liveUrl: "https://jbqguru.com"
   },
   {
     id: "sahodar",
@@ -6604,7 +6608,8 @@ var projects = [
     branch: "main",
     lastTouched: "2026-09-25",
     chargeRank: 6,
-    status: "open"
+    status: "open",
+    liveUrl: "https://sahodarusa.org"
   },
   {
     id: "sgu",
@@ -6614,7 +6619,8 @@ var projects = [
     branch: "main",
     lastTouched: "2026-09-08",
     chargeRank: 7,
-    status: "open"
+    status: "open",
+    liveUrl: "https://www.sgu.edu"
   },
   {
     id: "charging-rhino",
@@ -6624,7 +6630,8 @@ var projects = [
     branch: "main",
     lastTouched: seededOn,
     chargeRank: 8,
-    status: "open"
+    status: "open",
+    liveUrl: "https://charging-rhino.vercel.app"
   }
 ];
 var tasks = [
@@ -7406,6 +7413,24 @@ ${block}` : block;
             if (Array.isArray(body.tags)) {
               project.tags = cleanTags(body.tags);
               board.prefs.tags = cleanTags([...board.prefs.tags, ...project.tags]);
+            }
+            if ("liveUrl" in body) {
+              const raw = String(body.liveUrl ?? "").trim();
+              if (!raw) {
+                project.liveUrl = null;
+              } else {
+                const withProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+                let parsed;
+                try {
+                  parsed = new URL(withProtocol);
+                } catch {
+                  throw new Error("Live URL must be a valid link.");
+                }
+                if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+                  throw new Error("Live URL must be http(s).");
+                }
+                project.liveUrl = parsed.toString().replace(/\/$/, "");
+              }
             }
           })
         );

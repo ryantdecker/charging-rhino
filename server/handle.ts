@@ -485,6 +485,24 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
               project.tags = cleanTags(body.tags)
               board.prefs.tags = cleanTags([...board.prefs.tags, ...project.tags])
             }
+            if ('liveUrl' in body) {
+              const raw = String(body.liveUrl ?? '').trim()
+              if (!raw) {
+                project.liveUrl = null
+              } else {
+                const withProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`
+                let parsed: URL
+                try {
+                  parsed = new URL(withProtocol)
+                } catch {
+                  throw new Error('Live URL must be a valid link.')
+                }
+                if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+                  throw new Error('Live URL must be http(s).')
+                }
+                project.liveUrl = parsed.toString().replace(/\/$/, '')
+              }
+            }
           }),
         )
         return true
