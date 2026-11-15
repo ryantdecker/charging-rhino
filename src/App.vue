@@ -51,6 +51,7 @@ const overTaskId = ref<string | null>(null)
 let taskWasDragged = false
 const capturing = ref(false)
 const view = ref<'home' | 'tasks' | 'goals' | 'calendar' | 'progress' | 'settings'>('home')
+const sideOpen = ref(false)
 const horizon = ref<Horizon>('month')
 const activeTags = ref<string[]>([])
 const tagDraft = ref('')
@@ -167,9 +168,14 @@ function laneTasks(projectId: string, lane: Lane): Task[] {
   return tasksFor(projectId, lane).filter(matchesProjectFilter)
 }
 
+function closeSide() {
+  sideOpen.value = false
+}
+
 function show(next: (typeof nav)[number]['id']) {
   view.value = next
   if (next !== 'tasks') selectedId.value = null
+  closeSide()
 }
 
 function selectProject(id: string) {
@@ -178,6 +184,7 @@ function selectProject(id: string) {
   showDone.value = false
   projectFilter.value = ''
   editingTaskId.value = null
+  closeSide()
 }
 
 function openTask(id: string) {
@@ -216,6 +223,7 @@ async function addItem() {
   projectFilter.value = ''
   const id = await addTask(project.id, 'Untitled', 'now')
   editingTaskId.value = id
+  closeSide()
 }
 
 function startAddProject() {
@@ -334,11 +342,21 @@ async function submitLogin(password: string) {
 
 async function confirmSignOut() {
   if (!window.confirm('Sign out of Charging Rhino?')) return
+  closeSide()
   await logout()
+}
+
+function openCapture() {
+  capturing.value = true
+  closeSide()
 }
 
 onMounted(async () => {
   watchDayPart()
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') closeSide()
+  }
+  window.addEventListener('keydown', onKey)
   await hydrate()
   if (ready.value) {
     if (!horizonSeeded) {
@@ -389,8 +407,29 @@ function laneLabel(lane: Lane) {
     :error="loginError"
     @submit="submitLogin"
   />
-  <div v-else class="shell" :class="{ 'with-side': showSide }">
-    <aside v-if="showSide" class="side">
+  <div v-else class="shell" :class="{ 'with-side': showSide, 'side-open': sideOpen }">
+    <button
+      v-if="showSide"
+      class="side-toggle"
+      type="button"
+      :aria-expanded="sideOpen"
+      aria-controls="app-side"
+      aria-label="Menu"
+      @click="sideOpen = !sideOpen"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path v-if="sideOpen" d="M6 6l12 12M18 6L6 18" />
+        <path v-else d="M4 7h16M4 12h16M4 17h16" />
+      </svg>
+    </button>
+    <button
+      v-if="showSide && sideOpen"
+      class="side-backdrop"
+      type="button"
+      aria-label="Close menu"
+      @click="closeSide"
+    ></button>
+    <aside v-if="showSide" id="app-side" class="side">
       <div class="lockup">
         <img src="/mark-head.png" alt="" />
         <div class="wordmark">
@@ -468,7 +507,7 @@ function laneLabel(lane: Lane) {
             type="button"
             aria-label="From a photo"
             title="From a photo"
-            @click="capturing = true"
+            @click="openCapture"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h2l1.2-1.6A1.5 1.5 0 0 1 10.9 4h2.2a1.5 1.5 0 0 1 1.2.4L15.5 6h2A2.5 2.5 0 0 1 20 8.5v9A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5z" />

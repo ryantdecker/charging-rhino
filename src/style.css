@@ -885,19 +885,25 @@ h2.display {
 
 @media (max-width: 720px) {
   .splash-art img {
-    object-position: center 42%;
+    /* Prefer the rhino / path — prior 42% bias cropped them away on tall phones */
+    object-fit: cover;
+    object-position: 48% 68%;
   }
   .splash-hotspot {
-    left: 22%;
-    top: 54%;
-    width: 42%;
-    height: 26%;
+    left: 20%;
+    top: 52%;
+    width: 48%;
+    height: 30%;
     border-radius: 45% 50% 40% 42%;
+  }
+  .splash-brand {
+    top: max(12px, env(safe-area-inset-top, 0px));
+    left: max(12px, env(safe-area-inset-left, 0px));
   }
   .splash-panel {
     left: 50%;
     top: auto;
-    bottom: 16px;
+    bottom: max(16px, env(safe-area-inset-bottom, 0px));
     transform: translateX(-50%);
     width: min(100% - 24px, 400px);
     animation-name: splash-panel-up;
@@ -906,9 +912,20 @@ h2.display {
     left: 50%;
     transform: translateX(-50%);
     text-align: center;
-    bottom: 18px;
+    bottom: max(18px, env(safe-area-inset-bottom, 0px));
   }
   .splash-open .splash-hint { display: none; }
+}
+
+@media (max-width: 720px) and (max-aspect-ratio: 9 / 18) {
+  /* Extra-tall screens: pull a bit more of the lower scene into frame */
+  .splash-art img {
+    object-position: 48% 74%;
+  }
+  .splash-hotspot {
+    top: 50%;
+    height: 32%;
+  }
 }
 
 @keyframes splash-panel-up {
@@ -1121,34 +1138,64 @@ h2.display {
 .chart { width: 100%; height: auto; display: block; }
 .progress-row { cursor: default; }
 
+.side-toggle,
+.side-backdrop {
+  display: none;
+}
+
 @media (max-width: 980px) {
   .shell.with-side { grid-template-columns: 1fr; }
   .stat-row { grid-template-columns: 1fr; }
   .main > :not(.day-banner) { padding-inline: 16px; }
+  .side-toggle {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 45;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--rail);
+    color: white;
+    box-shadow: 0 8px 24px rgba(35, 51, 77, 0.28);
+  }
+  .side-toggle svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  .side-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    border: 0;
+    background: rgba(35, 51, 77, 0.45);
+  }
   .side {
-    position: sticky;
+    position: fixed;
     top: 0;
-    z-index: 3;
-    height: auto;
-    max-height: 46vh;
-    padding: 12px 12px 0;
+    left: 0;
+    bottom: 0;
+    width: min(288px, 86vw);
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    z-index: 42;
+    padding: 22px 14px 0;
+    transform: translateX(-105%);
+    transition: transform 0.28s ease;
+    box-shadow: 12px 0 40px rgba(35, 51, 77, 0.28);
   }
-  .side .app-nav,
-  .side .projects { flex-direction: row; overflow: auto; gap: 6px; }
-  .side .projects { flex: 1 1 auto; min-height: 0; }
-  .side .nav-label { display: none; }
-  .side .nav-heading { margin: 0 0 0 auto; }
-  .side .nav-add { color: white; }
-  .side button.nav,
-  .side button.project { width: auto; white-space: nowrap; }
-  .side-foot {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 0 12px;
+  .shell.side-open .side {
+    transform: translateX(0);
   }
-  .side-tools { margin: 0; width: 100%; }
   .main { padding: 22px 16px 48px; }
   .lanes { grid-template-columns: 1fr; }
   .hero-band { align-items: flex-start; }
