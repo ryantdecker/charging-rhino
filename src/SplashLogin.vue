@@ -31,7 +31,10 @@ function onSubmit() {
 
 <template>
   <div class="splash" :class="{ 'splash-open': showForm }">
-    <img class="splash-art" src="/splash.jpg" alt="" width="1920" height="1080" />
+    <picture class="splash-art">
+      <source media="(max-width: 720px)" srcset="/splash-mobile.jpg" width="576" height="1024" />
+      <img src="/splash.jpg" alt="" width="1024" height="576" />
+    </picture>
 
     <header class="splash-brand">
       <img src="/mark-head.png" alt="" class="splash-mark" />

@@ -729,10 +729,15 @@ h2.display {
   inset: 0;
   width: 100%;
   height: 100%;
+  display: block;
+  animation: splash-rise 1.1s ease-out both;
+}
+.splash-art img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   object-position: center;
   display: block;
-  animation: splash-rise 1.1s ease-out both;
 }
 .splash-brand {
   position: absolute;
@@ -879,11 +884,15 @@ h2.display {
 }
 
 @media (max-width: 720px) {
+  .splash-art img {
+    object-position: center 42%;
+  }
   .splash-hotspot {
-    left: 48%;
-    top: 48%;
-    width: 46%;
-    height: 38%;
+    left: 22%;
+    top: 54%;
+    width: 42%;
+    height: 26%;
+    border-radius: 45% 50% 40% 42%;
   }
   .splash-panel {
     left: 50%;
