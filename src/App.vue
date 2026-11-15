@@ -9,6 +9,7 @@ import SettingsView from './SettingsView.vue'
 import SplashLogin from './SplashLogin.vue'
 import TaskView from './TaskView.vue'
 import { activeDayPart, greetingFor, watchDayPart } from './dayPart'
+import { hrefFor, navigate, parseLocation, type AppRoute, type GoalTab } from './route'
 import {
   addProject,
   addTask,
@@ -51,6 +52,9 @@ const overTaskId = ref<string | null>(null)
 let taskWasDragged = false
 const capturing = ref(false)
 const view = ref<'home' | 'projects' | 'tasks' | 'goals' | 'calendar' | 'progress' | 'settings'>('home')
+const goalOpenId = ref<string | null>(null)
+const goalTab = ref<GoalTab>('journey')
+let ignoreRouteSync = false
 const sideOpen = ref(false)
 const narrowScreen = ref(
   typeof window !== 'undefined' && window.matchMedia('(max-width: 980px)').matches,
@@ -177,10 +181,104 @@ function closeSide() {
   sideOpen.value = false
 }
 
+function findProjectKey(id: string): string {
+  const project = board.projects.find((item) => item.id === id)
+  return project?.path || id
+}
+
+function findProjectByKey(key: string): Project | undefined {
+  const needle = key.toLowerCase()
+  return (
+    board.projects.find((item) => item.path.toLowerCase() === needle) ??
+    board.projects.find((item) => item.id.toLowerCase() === needle)
+  )
+}
+
+function routeFromState(): AppRoute {
+  if (view.value === 'home') return { name: 'home' }
+  if (view.value === 'projects' || (view.value === 'tasks' && !selectedId.value)) return { name: 'projects' }
+  if (view.value === 'tasks' && selectedId.value) {
+    return { name: 'project', projectKey: findProjectKey(selectedId.value) }
+  }
+  if (view.value === 'goals') {
+    return {
+      name: 'goals',
+      goalId: goalOpenId.value ?? undefined,
+      goalTab: goalOpenId.value ? goalTab.value : undefined,
+    }
+  }
+  if (view.value === 'calendar') return { name: 'calendar' }
+  if (view.value === 'progress') return { name: 'progress' }
+  return { name: 'settings' }
+}
+
+function syncUrl(mode: 'push' | 'replace' = 'push') {
+  if (ignoreRouteSync || typeof location === 'undefined') return
+  navigate(routeFromState(), mode)
+}
+
+function applyRoute(route: AppRoute) {
+  ignoreRouteSync = true
+  try {
+    goalOpenId.value = null
+    goalTab.value = 'journey'
+    if (route.name === 'home') {
+      view.value = 'home'
+      selectedId.value = null
+      return
+    }
+    if (route.name === 'projects') {
+      view.value = 'projects'
+      selectedId.value = null
+      return
+    }
+    if (route.name === 'project') {
+      const project = findProjectByKey(route.projectKey)
+      if (!project) {
+        view.value = 'projects'
+        selectedId.value = null
+        return
+      }
+      view.value = 'tasks'
+      selectedId.value = project.id
+      showDone.value = false
+      projectFilter.value = ''
+      editingTaskId.value = null
+      return
+    }
+    if (route.name === 'goals') {
+      view.value = 'goals'
+      selectedId.value = null
+      goalOpenId.value = route.goalId ?? null
+      goalTab.value = route.goalTab ?? 'journey'
+      return
+    }
+    if (route.name === 'calendar') {
+      view.value = 'calendar'
+      selectedId.value = null
+      return
+    }
+    if (route.name === 'progress') {
+      view.value = 'progress'
+      selectedId.value = null
+      return
+    }
+    view.value = 'settings'
+    selectedId.value = null
+  } finally {
+    ignoreRouteSync = false
+  }
+}
+
 function show(next: (typeof nav)[number]['id']) {
-  view.value = next
+  view.value = next === 'tasks' ? 'projects' : next
   if (next !== 'tasks') selectedId.value = null
+  if (next !== 'goals') {
+    goalOpenId.value = null
+    goalTab.value = 'journey'
+  }
   closeSide()
+  syncUrl('push')
 }
 
 function navCurrent(id: (typeof nav)[number]['id']): boolean {
@@ -192,15 +290,18 @@ function navCurrent(id: (typeof nav)[number]['id']): boolean {
 function selectProject(id: string) {
   view.value = 'tasks'
   selectedId.value = id
+  goalOpenId.value = null
   showDone.value = false
   projectFilter.value = ''
   editingTaskId.value = null
   closeSide()
+  syncUrl('push')
 }
 
 function clearProject() {
   selectedId.value = null
   view.value = 'projects'
+  syncUrl('push')
 }
 
 function openTask(id: string) {
@@ -231,6 +332,7 @@ async function addItem() {
   const project = selected.value ?? openProjects()[0]
   if (!project) {
     addingProject.value = true
+    show('projects')
     return
   }
   view.value = 'tasks'
@@ -240,12 +342,14 @@ async function addItem() {
   const id = await addTask(project.id, 'Untitled', 'now')
   editingTaskId.value = id
   closeSide()
+  syncUrl('push')
 }
 
 function startAddProject() {
   addingProject.value = true
   view.value = 'projects'
   selectedId.value = null
+  syncUrl('push')
 }
 
 function onDragStart(id: string, event: DragEvent) {
@@ -378,12 +482,28 @@ function openCapture() {
   closeSide()
 }
 
+function restoreRoute() {
+  applyRoute(parseLocation())
+  // Normalize unknown project/goal keys to a clean URL.
+  const wanted = hrefFor(routeFromState())
+  const current = `${location.pathname}${location.search}`
+  if (wanted !== current) navigate(routeFromState(), 'replace')
+}
+
+watch([goalOpenId, goalTab], () => {
+  if (ignoreRouteSync || !ready.value || view.value !== 'goals') return
+  syncUrl('push')
+})
+
 onMounted(async () => {
   watchDayPart()
   const onKey = (event: KeyboardEvent) => {
     if (event.key === 'Escape') closeSide()
   }
   window.addEventListener('keydown', onKey)
+  window.addEventListener('popstate', () => {
+    applyRoute(parseLocation())
+  })
   const narrowQuery = window.matchMedia('(max-width: 980px)')
   const syncNarrow = () => {
     narrowScreen.value = narrowQuery.matches
@@ -398,13 +518,19 @@ onMounted(async () => {
       horizonSeeded = true
     }
     watchBoard()
+    restoreRoute()
   }
+})
+
+watch(ready, (isReady) => {
+  if (isReady) restoreRoute()
 })
 
 function restore() {
   if (!window.confirm('Reset the board to the starter seed?')) return
   resetBoard()
   selectedId.value = null
+  syncUrl('replace')
 }
 
 function syncedLabel() {
@@ -571,7 +697,11 @@ function laneLabel(lane: Lane) {
       <DayBanner v-if="ready && !loadError" />
       <p v-if="loadError" class="banner">{{ loadError }}</p>
       <p v-else-if="!ready" class="lede">Loading the board…</p>
-      <GoalsView v-else-if="view === 'goals'" />
+      <GoalsView
+        v-else-if="view === 'goals'"
+        v-model:open-id="goalOpenId"
+        v-model:detail-tab="goalTab"
+      />
       <CalendarView v-else-if="view === 'calendar'" />
       <ProgressView v-else-if="view === 'progress'" />
       <SettingsView v-else-if="view === 'settings'" />
@@ -706,7 +836,7 @@ function laneLabel(lane: Lane) {
           <button class="solid" type="submit">Add</button>
         </form>
         <div class="stack">
-          <article v-for="project in openProjects()" :key="project.id" class="row">
+          <article v-for="project in openProjects()" :key="project.id" class="row project-row">
             <div class="who">
               <strong>{{ project.name }}</strong>
               <p class="meta">
@@ -715,23 +845,25 @@ function laneLabel(lane: Lane) {
                 <template v-if="project.liveUrl"> · live</template>
               </p>
             </div>
-            <div class="actions">
+            <div class="actions project-row-actions">
               <a
                 v-if="project.liveUrl"
-                class="texty"
+                class="row-link"
                 :href="project.liveUrl"
                 target="_blank"
                 rel="noopener noreferrer"
               >Live</a>
-              <button class="texty" type="button" @click="selectProject(project.id)">Open</button>
+              <button class="row-link" type="button" @click="selectProject(project.id)">Open</button>
             </div>
           </article>
-          <article v-for="project in shelvedProjects()" :key="project.id" class="row">
+          <article v-for="project in shelvedProjects()" :key="project.id" class="row project-row">
             <div class="who">
               <strong>{{ project.name }}</strong>
               <p class="meta">Shelved · {{ openCount(project.id) }} open</p>
             </div>
-            <button class="texty" type="button" @click="selectProject(project.id)">Open</button>
+            <div class="actions project-row-actions">
+              <button class="row-link" type="button" @click="selectProject(project.id)">Open</button>
+            </div>
           </article>
         </div>
         <div class="actions tool-row">

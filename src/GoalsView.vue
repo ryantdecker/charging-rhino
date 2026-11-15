@@ -1,16 +1,42 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { addGoal, addMilestone, board, removeGoal, toggleMilestone } from './store'
 import type { Goal } from './types'
+import type { GoalTab } from './route'
+
+const props = defineProps<{
+  openId?: string | null
+  detailTab?: GoalTab
+}>()
+
+const emit = defineEmits<{
+  'update:openId': [value: string | null]
+  'update:detailTab': [value: GoalTab]
+}>()
 
 const filter = ref<'all' | 'active' | 'completed'>('all')
-const detailTab = ref<'journey' | 'progress'>('journey')
 const adding = ref(false)
 const name = ref('')
 const context = ref('')
-const openId = ref<string | null>(null)
 const milestoneDraft = ref('')
 const menuOpen = ref(false)
+
+const openId = computed({
+  get: () => props.openId ?? null,
+  set: (value) => emit('update:openId', value),
+})
+
+const detailTab = computed({
+  get: () => props.detailTab ?? 'journey',
+  set: (value) => emit('update:detailTab', value),
+})
+
+watch(
+  () => props.openId,
+  (id) => {
+    if (id && !board.goals.some((goal) => goal.id === id)) emit('update:openId', null)
+  },
+)
 
 const visible = computed(() =>
   board.goals.filter((goal) => (filter.value === 'all' ? true : goal.status === filter.value)),
@@ -75,8 +101,8 @@ async function create() {
   context.value = ''
   adding.value = false
   if (goal) {
-    openId.value = goal.id
     detailTab.value = 'journey'
+    openId.value = goal.id
   }
 }
 
@@ -88,14 +114,14 @@ function createMilestone(goal: Goal) {
 }
 
 function openGoal(id: string) {
-  openId.value = id
   detailTab.value = 'journey'
   menuOpen.value = false
+  openId.value = id
 }
 
 function closeGoal() {
-  openId.value = null
   menuOpen.value = false
+  openId.value = null
 }
 
 function destroyGoal(id: string) {
