@@ -84,10 +84,20 @@ function newTaskFields(at: string) {
 
 const laneWeight: Record<Lane, number> = { now: 0, next: 1, later: 2 }
 
+function laneSiblings(board: Board, projectId: string, lane: Lane, exceptId?: string) {
+  return board.tasks
+    .filter((item) => {
+      if (item.status === 'done' || item.id === exceptId) return false
+      if (item.lane !== lane) return false
+      // Now is a global charge queue across projects; other lanes stay per-project.
+      if (lane === 'now') return true
+      return item.projectId === projectId
+    })
+    .sort((a, b) => a.order - b.order)
+}
+
 function nextOrder(board: Board, projectId: string, lane: Lane, front: boolean): number {
-  const orders = board.tasks
-    .filter((item) => item.projectId === projectId && item.lane === lane && item.status !== 'done')
-    .map((item) => item.order)
+  const orders = laneSiblings(board, projectId, lane).map((item) => item.order)
   if (orders.length === 0) return 0
   return front ? Math.min(...orders) - 1 : Math.max(...orders) + 1
 }
@@ -321,9 +331,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
             const lane = (body.lane === 'now' || body.lane === 'next' || body.lane === 'later' ? body.lane : item.lane) as Lane
             const beforeId = typeof body.beforeId === 'string' ? body.beforeId : null
             item.lane = lane
-            const siblings = board.tasks
-              .filter((candidate) => candidate.projectId === item.projectId && candidate.lane === lane && candidate.status !== 'done' && candidate.id !== item.id)
-              .sort((a, b) => a.order - b.order)
+            const siblings = laneSiblings(board, item.projectId, lane, item.id)
             const index = beforeId ? siblings.findIndex((candidate) => candidate.id === beforeId) : siblings.length
             siblings.splice(index < 0 ? siblings.length : index, 0, item)
             siblings.forEach((candidate, order) => {
@@ -343,9 +351,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
           await updateBoard((board) => {
             const item = task(board, id)
             if (!item) return
-            const siblings = board.tasks
-              .filter((candidate) => candidate.projectId === item.projectId && candidate.lane === item.lane && candidate.status !== 'done')
-              .sort((a, b) => a.order - b.order)
+            const siblings = laneSiblings(board, item.projectId, item.lane)
             const index = siblings.findIndex((candidate) => candidate.id === id)
             const neighbor = siblings[index + direction]
             if (!neighbor) return

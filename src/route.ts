@@ -2,6 +2,7 @@ export type GoalTab = 'journey' | 'progress'
 
 export type AppRoute =
   | { name: 'home' }
+  | { name: 'tasks' }
   | { name: 'projects' }
   | { name: 'project'; projectKey: string }
   | { name: 'goals'; goalId?: string; goalTab?: GoalTab }
@@ -29,7 +30,7 @@ export function parseLocation(pathname = location.pathname, search = location.se
   }
   if (head === 'tasks') {
     if (key) return { name: 'project', projectKey: decodeURIComponent(key) }
-    return { name: 'projects' }
+    return { name: 'tasks' }
   }
   if (head === 'goals') {
     if (key) return { name: 'goals', goalId: decodeURIComponent(key), goalTab: tab }
@@ -53,7 +54,8 @@ export function hrefFor(route: AppRoute): string {
   }
 
   let path = '/'
-  if (route.name === 'projects') path = '/projects'
+  if (route.name === 'tasks') path = '/tasks'
+  else if (route.name === 'projects') path = '/projects'
   else if (route.name === 'project') path = `/projects/${encodeURIComponent(route.projectKey)}`
   else if (route.name === 'goals') {
     path = route.goalId ? `/goals/${encodeURIComponent(route.goalId)}` : '/goals'

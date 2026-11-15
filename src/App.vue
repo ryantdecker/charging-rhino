@@ -20,9 +20,11 @@ import {
   login,
   logout,
   moveProjectTo,
-  placeTask,
+  nowQueue,
   openCount,
   openProjects,
+  placeTask,
+  projectById,
   ready,
   resetBoard,
   saveNotes,
@@ -63,6 +65,8 @@ const horizon = ref<Horizon>('month')
 const activeTags = ref<string[]>([])
 const tagDraft = ref('')
 const liveUrlDraft = ref('')
+const notesDraft = ref('')
+const editingProjectInfo = ref(false)
 const loginError = ref('')
 const loggingIn = ref(false)
 const previewSplash = ref(
@@ -88,7 +92,7 @@ const horizonCopy: Record<Horizon, string> = {
 const nav = [
   { id: 'home', label: 'Home', show: 'always' },
   { id: 'projects', label: 'Projects', show: 'mobile' },
-  { id: 'tasks', label: 'Tasks', show: 'desktop' },
+  { id: 'tasks', label: 'Tasks', show: 'always' },
   { id: 'goals', label: 'Goals', show: 'always' },
   { id: 'calendar', label: 'Calendar', show: 'always' },
   { id: 'progress', label: 'Progress', show: 'always' },
@@ -196,7 +200,8 @@ function findProjectByKey(key: string): Project | undefined {
 
 function routeFromState(): AppRoute {
   if (view.value === 'home') return { name: 'home' }
-  if (view.value === 'projects' || (view.value === 'tasks' && !selectedId.value)) return { name: 'projects' }
+  if (view.value === 'tasks' && !selectedId.value) return { name: 'tasks' }
+  if (view.value === 'projects') return { name: 'projects' }
   if (view.value === 'tasks' && selectedId.value) {
     return { name: 'project', projectKey: findProjectKey(selectedId.value) }
   }
@@ -227,6 +232,11 @@ function applyRoute(route: AppRoute) {
       selectedId.value = null
       return
     }
+    if (route.name === 'tasks') {
+      view.value = 'tasks'
+      selectedId.value = null
+      return
+    }
     if (route.name === 'projects') {
       view.value = 'projects'
       selectedId.value = null
@@ -237,6 +247,7 @@ function applyRoute(route: AppRoute) {
       if (!project) {
         view.value = 'projects'
         selectedId.value = null
+        editingProjectInfo.value = false
         return
       }
       view.value = 'tasks'
@@ -244,6 +255,7 @@ function applyRoute(route: AppRoute) {
       showDone.value = false
       projectFilter.value = ''
       editingTaskId.value = null
+      editingProjectInfo.value = false
       return
     }
     if (route.name === 'goals') {
@@ -271,8 +283,8 @@ function applyRoute(route: AppRoute) {
 }
 
 function show(next: (typeof nav)[number]['id']) {
-  view.value = next === 'tasks' ? 'projects' : next
-  if (next !== 'tasks') selectedId.value = null
+  view.value = next
+  selectedId.value = null
   if (next !== 'goals') {
     goalOpenId.value = null
     goalTab.value = 'journey'
@@ -282,9 +294,31 @@ function show(next: (typeof nav)[number]['id']) {
 }
 
 function navCurrent(id: (typeof nav)[number]['id']): boolean {
-  if (id === 'projects') return view.value === 'projects' || view.value === 'tasks'
-  if (id === 'tasks') return view.value === 'tasks' || view.value === 'projects'
+  if (id === 'projects') return view.value === 'projects' || (view.value === 'tasks' && !!selectedId.value)
+  if (id === 'tasks') return view.value === 'tasks' && !selectedId.value
   return view.value === id
+}
+
+const chargeNow = computed(() =>
+  nowQueue().map((task, index) => ({
+    task,
+    index,
+    project: projectById(task.projectId),
+  })),
+)
+
+function onNowDrop(beforeId: string) {
+  const id = draggingTaskId.value
+  clearTaskDrag()
+  if (!id || id === beforeId) return
+  placeTask(id, 'now', beforeId)
+}
+
+function onNowDropEnd() {
+  const id = draggingTaskId.value
+  clearTaskDrag()
+  if (!id) return
+  placeTask(id, 'now', null)
 }
 
 function selectProject(id: string) {
@@ -294,14 +328,44 @@ function selectProject(id: string) {
   showDone.value = false
   projectFilter.value = ''
   editingTaskId.value = null
+  editingProjectInfo.value = false
   closeSide()
   syncUrl('push')
 }
 
 function clearProject() {
   selectedId.value = null
+  editingProjectInfo.value = false
   view.value = 'projects'
   syncUrl('push')
+}
+
+function openProjectInfoEdit() {
+  const project = selected.value
+  if (!project) return
+  liveUrlDraft.value = project.liveUrl ?? ''
+  notesDraft.value = project.notes ?? ''
+  tagDraft.value = ''
+  editingProjectInfo.value = true
+}
+
+function closeProjectInfoEdit() {
+  editingProjectInfo.value = false
+  tagDraft.value = ''
+  const project = selected.value
+  liveUrlDraft.value = project?.liveUrl ?? ''
+  notesDraft.value = project?.notes ?? ''
+}
+
+function saveProjectInfo() {
+  const project = selected.value
+  if (!project) return
+  setProjectLiveUrl(project.id, liveUrlDraft.value.trim() || null)
+  saveNotes(project.id, notesDraft.value)
+  liveUrlDraft.value = project.liveUrl ?? ''
+  notesDraft.value = project.notes ?? ''
+  editingProjectInfo.value = false
+  tagDraft.value = ''
 }
 
 function openTask(id: string) {
@@ -391,15 +455,10 @@ function removeTag(tag: string) {
   )
 }
 
-function saveLiveUrl() {
-  const project = selected.value
-  if (!project) return
-  setProjectLiveUrl(project.id, liveUrlDraft.value.trim() || null)
-  liveUrlDraft.value = project.liveUrl ?? ''
-}
-
 watch(selected, (project) => {
   liveUrlDraft.value = project?.liveUrl ?? ''
+  notesDraft.value = project?.notes ?? ''
+  if (!project) editingProjectInfo.value = false
 })
 
 function onTaskDragStart(id: string, event: DragEvent) {
@@ -549,9 +608,6 @@ function onCaptured(projectId: string) {
   selectProject(projectId)
 }
 
-function onNotes(id: string, event: Event) {
-  saveNotes(id, (event.target as HTMLTextAreaElement).value)
-}
 
 function laneLabel(lane: Lane) {
   if (lane === 'now') return 'Now'
@@ -825,7 +881,67 @@ function laneLabel(lane: Lane) {
         </div>
       </section>
 
-      <section v-else-if="view === 'projects' || (view === 'tasks' && !selected)" aria-labelledby="projects-title">
+      <section v-else-if="view === 'tasks' && !selected" aria-labelledby="tasks-title">
+        <p class="kicker">Across projects</p>
+        <div class="project-head">
+          <h2 id="tasks-title" class="display">Now.</h2>
+        </div>
+        <p class="lede">Drag to set charge priority across every open project.</p>
+        <div
+          class="now-queue"
+          :class="{ over: overLane === 'now' }"
+          @dragover.prevent="overLane = 'now'"
+          @dragleave="onLaneLeave('now', $event)"
+          @drop="onNowDropEnd"
+        >
+          <p v-if="chargeNow.length === 0" class="empty">Nothing in Now. Promote a task from a project.</p>
+          <article
+            v-for="row in chargeNow"
+            :key="row.task.id"
+            class="row now-row"
+            :class="{ dragging: draggingTaskId === row.task.id, over: overTaskId === row.task.id }"
+            draggable="true"
+            role="button"
+            tabindex="0"
+            :aria-label="`Edit ${row.task.title}`"
+            @click="openTask(row.task.id)"
+            @keydown.enter.prevent="openTask(row.task.id)"
+            @dragstart="onTaskDragStart(row.task.id, $event)"
+            @dragover.prevent="overTaskId = row.task.id"
+            @drop.stop="onNowDrop(row.task.id)"
+            @dragend="clearTaskDrag"
+          >
+            <span class="rank">{{ row.index + 1 }}</span>
+            <div class="who">
+              <strong>{{ row.task.title }}</strong>
+              <p class="meta">
+                {{ row.project?.name ?? 'Unknown project' }}
+                <template v-if="row.task.status === 'in_progress'"> · in progress</template>
+              </p>
+              <p v-if="row.task.note" class="note">{{ row.task.note }}</p>
+            </div>
+            <div class="actions">
+              <button
+                class="texty"
+                type="button"
+                @click.stop="setTaskStatus(row.task.id, row.task.status === 'in_progress' ? 'done' : 'in_progress')"
+              >
+                {{ row.task.status === 'in_progress' ? 'Done' : 'Start' }}
+              </button>
+              <button
+                v-if="row.project"
+                class="texty"
+                type="button"
+                @click.stop="selectProject(row.project.id)"
+              >
+                Open
+              </button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section v-else-if="view === 'projects'" aria-labelledby="projects-title">
         <p class="kicker">Projects</p>
         <div class="project-head">
           <h2 id="projects-title" class="display">Projects.</h2>
@@ -874,12 +990,16 @@ function laneLabel(lane: Lane) {
       </section>
 
       <section v-else-if="selected" :aria-labelledby="`project-${selected.id}`">
-        <button class="texty" type="button" @click="clearProject">All projects</button>
+        <nav class="crumb" aria-label="Breadcrumb">
+          <button class="crumb-link" type="button" @click="clearProject">Projects</button>
+          <span class="crumb-sep" aria-hidden="true">/</span>
+          <span class="crumb-current">{{ selected.name }}</span>
+        </nav>
         <div class="project-head">
           <div>
             <p class="kicker">{{ selected.status === 'shelved' ? 'Shelved' : 'Open project' }}</p>
             <h2 :id="`project-${selected.id}`" class="display">{{ selected.name }}</h2>
-            <p class="lede">{{ selected.summary }}</p>
+            <p v-if="selected.summary" class="lede">{{ selected.summary }}</p>
             <p class="meta path">
               Key {{ selected.path }}
               <template v-if="selected.branch"> · {{ selected.branch }}</template>
@@ -888,22 +1008,15 @@ function laneLabel(lane: Lane) {
             <p v-if="selected.liveUrl" class="meta">
               <a class="live-link" :href="selected.liveUrl" target="_blank" rel="noopener noreferrer">Open live app</a>
             </p>
-            <form class="live-url-editor" @submit.prevent="saveLiveUrl">
-              <input
-                v-model="liveUrlDraft"
-                aria-label="Live app URL"
-                placeholder="Live app URL (optional)"
-              />
-              <button class="texty" type="submit">Save link</button>
-            </form>
-            <form class="tag-editor" @submit.prevent="addTag">
-              <span v-for="tag in selected.tags ?? []" :key="tag" class="chip tag">
-                {{ tag }}
-                <button type="button" :aria-label="`Remove ${tag}`" @click="removeTag(tag)">×</button>
-              </span>
-              <input v-model="tagDraft" aria-label="Add a tag" placeholder="Add a tag" />
-              <button class="solid" type="submit">Add tag</button>
-            </form>
+            <template v-if="!editingProjectInfo">
+              <div v-if="selected.tags?.length" class="project-tags" aria-label="Tags">
+                <span v-for="tag in selected.tags" :key="tag" class="chip tag">{{ tag }}</span>
+              </div>
+              <div v-if="selected.notes?.trim()" class="notes-read">
+                <h3>Notes</h3>
+                <p>{{ selected.notes }}</p>
+              </div>
+            </template>
           </div>
           <div class="actions">
             <a
@@ -916,6 +1029,45 @@ function laneLabel(lane: Lane) {
               Live app
             </a>
             <button
+              v-if="!editingProjectInfo"
+              class="texty"
+              type="button"
+              @click="openProjectInfoEdit"
+            >
+              Edit project
+            </button>
+          </div>
+        </div>
+
+        <p v-if="selected.status === 'shelved'" class="notice">Shelved. It stays off the charge until you put it back.</p>
+
+        <div v-if="editingProjectInfo" class="project-edit" aria-label="Edit project">
+          <form class="live-url-editor" @submit.prevent="saveProjectInfo">
+            <input
+              v-model="liveUrlDraft"
+              aria-label="Live app URL"
+              placeholder="Live app URL (optional)"
+            />
+          </form>
+          <form class="tag-editor" @submit.prevent="addTag">
+            <span v-for="tag in selected.tags ?? []" :key="tag" class="chip tag">
+              {{ tag }}
+              <button type="button" :aria-label="`Remove ${tag}`" @click="removeTag(tag)">×</button>
+            </span>
+            <input v-model="tagDraft" aria-label="Add a tag" placeholder="Add a tag" />
+            <button class="solid" type="submit">Add tag</button>
+          </form>
+          <div class="notes-block">
+            <h3>Notes</h3>
+            <textarea
+              v-model="notesDraft"
+              rows="4"
+              aria-label="Project notes"
+              placeholder="Nothing written down yet."
+            />
+          </div>
+          <div class="actions project-edit-actions">
+            <button
               v-if="selected.status === 'open'"
               class="texty"
               type="button"
@@ -923,13 +1075,18 @@ function laneLabel(lane: Lane) {
             >
               Shelve
             </button>
-            <button v-else class="solid" type="button" @click="setProjectStatus(selected.id, 'open')">
+            <button
+              v-else
+              class="texty"
+              type="button"
+              @click="setProjectStatus(selected.id, 'open')"
+            >
               Put back on the charge
             </button>
+            <button class="texty" type="button" @click="closeProjectInfoEdit">Cancel</button>
+            <button class="solid" type="button" @click="saveProjectInfo">Save</button>
           </div>
         </div>
-
-        <p v-if="selected.status === 'shelved'" class="notice">Shelved. It stays off the charge until you put it back.</p>
 
         <div class="composer adder">
           <form @submit.prevent="createTask(selected)">
@@ -942,17 +1099,6 @@ function laneLabel(lane: Lane) {
             <button class="solid" type="submit">Add</button>
             <button class="texty" type="button" @click="capturing = true">From a photo</button>
           </form>
-        </div>
-
-        <div class="notes-block">
-          <h3>Notes</h3>
-          <textarea
-            :value="selected.notes ?? ''"
-            rows="4"
-            aria-label="Project notes"
-            placeholder="Nothing written down yet."
-            @change="onNotes(selected.id, $event)"
-          />
         </div>
 
         <div class="project-filters">

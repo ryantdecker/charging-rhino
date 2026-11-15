@@ -250,13 +250,29 @@ export function setAssist(id: string, assist: number): void {
   void commit(`/api/tasks/${id}`, { method: 'PATCH', body: { assist: score } })
 }
 
+function laneSiblings(projectId: string, lane: Lane, exceptId?: string): Task[] {
+  return board.tasks
+    .filter((task) => {
+      if (!isActiveTask(task) || task.lane !== lane || task.id === exceptId) return false
+      if (lane === 'now') return true
+      return task.projectId === projectId
+    })
+    .sort((a, b) => a.order - b.order)
+}
+
+/** Open Now tasks across open projects, in charge priority order. */
+export function nowQueue(): Task[] {
+  const openIds = new Set(openProjects().map((project) => project.id))
+  return board.tasks
+    .filter((task) => openIds.has(task.projectId) && task.lane === 'now' && isActiveTask(task))
+    .sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt))
+}
+
 export function placeTask(id: string, lane: Lane, beforeId: string | null): void {
   const item = board.tasks.find((task) => task.id === id)
   if (!item || item.status === 'done' || beforeId === id) return
   item.lane = lane
-  const siblings = board.tasks
-    .filter((task) => task.projectId === item.projectId && task.lane === lane && isActiveTask(task) && task.id !== id)
-    .sort((a, b) => a.order - b.order)
+  const siblings = laneSiblings(item.projectId, lane, item.id)
   const index = beforeId ? siblings.findIndex((task) => task.id === beforeId) : siblings.length
   siblings.splice(index < 0 ? siblings.length : index, 0, item)
   siblings.forEach((task, order) => {
