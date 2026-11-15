@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import {
+  currentDayPart,
+  dayPartLabel,
+  dayPartOverride,
+  dayParts,
+  watchDayPart,
+  type DayPart,
+} from './dayPart'
 import { board, saveSettings, setProjectTags } from './store'
 import type { Horizon, Project } from './types'
 
@@ -11,6 +19,18 @@ const horizons: { id: Horizon; label: string; note: string }[] = [
   { id: 'week', label: 'Week', note: 'Home opens on Now and Next.' },
   { id: 'month', label: 'Month', note: 'Home opens on the whole charge.' },
 ]
+
+onMounted(() => watchDayPart())
+
+const sceneNote = computed(() =>
+  dayPartOverride.value
+    ? `Preview locked to ${dayPartLabel[dayPartOverride.value]}.`
+    : `Following the clock (${dayPartLabel[currentDayPart.value]}).`,
+)
+
+function setScene(part: DayPart | null) {
+  dayPartOverride.value = part
+}
 
 const catalog = computed(() => [...board.prefs.tags].sort((a, b) => a.localeCompare(b)))
 const projects = computed(() =>
@@ -101,6 +121,28 @@ function setHorizon(value: Horizon) {
         </button>
       </div>
       <p class="meta">{{ horizons.find((item) => item.id === board.prefs.defaultHorizon)?.note }}</p>
+    </article>
+
+    <article class="settings-block">
+      <header>
+        <h3>Day scene</h3>
+        <p>Banner and greeting. Auto follows the clock; pick a scene to preview.</p>
+      </header>
+      <div class="mode scene-mode" role="group" aria-label="Day scene">
+        <button type="button" :aria-pressed="dayPartOverride === null" @click="setScene(null)">
+          Auto
+        </button>
+        <button
+          v-for="part in dayParts"
+          :key="part"
+          type="button"
+          :aria-pressed="dayPartOverride === part"
+          @click="setScene(part)"
+        >
+          {{ dayPartLabel[part] }}
+        </button>
+      </div>
+      <p class="meta">{{ sceneNote }}</p>
     </article>
 
     <article class="settings-block">

@@ -3,7 +3,6 @@ import { computed, onMounted, ref, watch } from 'vue'
 import CalendarView from './CalendarView.vue'
 import CaptureSheet from './CaptureSheet.vue'
 import DayBanner from './DayBanner.vue'
-import DayPreviewFab from './DayPreviewFab.vue'
 import GoalsView from './GoalsView.vue'
 import ProgressView from './ProgressView.vue'
 import SettingsView from './SettingsView.vue'
@@ -557,7 +556,6 @@ function laneLabel(lane: Lane) {
 
     <main class="main">
       <DayBanner v-if="ready && !loadError" />
-      <DayPreviewFab v-if="ready && !loadError" />
       <p v-if="loadError" class="banner">{{ loadError }}</p>
       <p v-else-if="!ready" class="lede">Loading the board…</p>
       <GoalsView v-else-if="view === 'goals'" />
