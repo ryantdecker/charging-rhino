@@ -14,6 +14,7 @@ import type { Horizon, Project } from './types'
 const tagDraft = ref('')
 const editFrom = ref<string | null>(null)
 const editTo = ref('')
+const refreshing = ref(false)
 const horizons: { id: Horizon; label: string; note: string }[] = [
   { id: 'day', label: 'Day', note: 'Home opens on the Now lane.' },
   { id: 'week', label: 'Week', note: 'Home opens on Now and Next.' },
@@ -21,6 +22,13 @@ const horizons: { id: Horizon; label: string; note: string }[] = [
 ]
 
 onMounted(() => watchDayPart())
+
+const isStandalone = computed(() => {
+  if (typeof window === 'undefined') return false
+  const media = window.matchMedia('(display-mode: standalone)').matches
+  const ios = 'standalone' in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
+  return media || ios
+})
 
 const sceneNote = computed(() =>
   dayPartOverride.value
@@ -30,6 +38,26 @@ const sceneNote = computed(() =>
 
 function setScene(part: DayPart | null) {
   dayPartOverride.value = part
+}
+
+async function hardRefresh() {
+  if (refreshing.value) return
+  refreshing.value = true
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(regs.map((reg) => reg.unregister()))
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys()
+      await Promise.all(keys.map((key) => caches.delete(key)))
+    }
+  } catch {
+    // Still reload even if cache cleanup fails.
+  }
+  const url = new URL(location.href)
+  url.searchParams.set('_rhino_reload', String(Date.now()))
+  location.replace(url.toString())
 }
 
 const catalog = computed(() => [...board.prefs.tags].sort((a, b) => a.localeCompare(b)))
@@ -103,6 +131,23 @@ function setHorizon(value: Horizon) {
       <h2 id="settings-title" class="display">Admin.</h2>
     </div>
     <p class="lede">Tags and the defaults that shape the charge.</p>
+
+    <article class="settings-block">
+      <header>
+        <h3>App</h3>
+        <p>
+          <template v-if="isStandalone">
+            You’re on the Home Screen app. Use this when a deploy isn’t showing up.
+          </template>
+          <template v-else>
+            Clears the cached shell and reloads — useful after an update, especially from the Home Screen app.
+          </template>
+        </p>
+      </header>
+      <button class="solid" type="button" :disabled="refreshing" @click="hardRefresh">
+        {{ refreshing ? 'Refreshing…' : 'Hard refresh' }}
+      </button>
+    </article>
 
     <article class="settings-block">
       <header>
