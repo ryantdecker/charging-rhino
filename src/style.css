@@ -1222,7 +1222,7 @@ h2.display {
   }
   .nav-show-mobile { display: flex !important; }
   .nav-show-desktop { display: none !important; }
-  .side-projects { display: none; }
+  .side-projects { display: none !important; }
   .main { padding: 0 0 48px; }
   .main > :first-child:not(.day-banner) { padding-top: 22px; }
   .lanes { grid-template-columns: 1fr; }

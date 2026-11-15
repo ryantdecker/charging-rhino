@@ -52,6 +52,9 @@ let taskWasDragged = false
 const capturing = ref(false)
 const view = ref<'home' | 'projects' | 'tasks' | 'goals' | 'calendar' | 'progress' | 'settings'>('home')
 const sideOpen = ref(false)
+const narrowScreen = ref(
+  typeof window !== 'undefined' && window.matchMedia('(max-width: 980px)').matches,
+)
 const horizon = ref<Horizon>('month')
 const activeTags = ref<string[]>([])
 const tagDraft = ref('')
@@ -369,6 +372,13 @@ onMounted(async () => {
     if (event.key === 'Escape') closeSide()
   }
   window.addEventListener('keydown', onKey)
+  const narrowQuery = window.matchMedia('(max-width: 980px)')
+  const syncNarrow = () => {
+    narrowScreen.value = narrowQuery.matches
+    if (!narrowQuery.matches) sideOpen.value = false
+  }
+  syncNarrow()
+  narrowQuery.addEventListener('change', syncNarrow)
   await hydrate()
   if (ready.value) {
     if (!horizonSeeded) {
@@ -471,7 +481,7 @@ function laneLabel(lane: Lane) {
           {{ item.label }}
         </button>
       </nav>
-      <nav class="projects side-projects" aria-label="Projects">
+      <nav v-if="!narrowScreen" class="projects side-projects" aria-label="Projects">
         <div class="nav-heading">
           <p class="nav-label">Projects</p>
           <button class="nav-add" type="button" @click="startAddProject">Add</button>
