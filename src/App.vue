@@ -44,6 +44,7 @@ const addingProject = ref(false)
 const projectDraft = ref('')
 const taskDraft = ref('')
 const taskLane = ref<Lane>('now')
+const addingTask = ref(false)
 const showDone = ref(false)
 const projectFilter = ref('')
 const editingTaskId = ref<string | null>(null)
@@ -256,6 +257,7 @@ function applyRoute(route: AppRoute) {
       projectFilter.value = ''
       editingTaskId.value = null
       editingProjectInfo.value = false
+      addingTask.value = false
       return
     }
     if (route.name === 'goals') {
@@ -329,6 +331,7 @@ function selectProject(id: string) {
   projectFilter.value = ''
   editingTaskId.value = null
   editingProjectInfo.value = false
+  addingTask.value = false
   closeSide()
   syncUrl('push')
 }
@@ -336,8 +339,21 @@ function selectProject(id: string) {
 function clearProject() {
   selectedId.value = null
   editingProjectInfo.value = false
+  addingTask.value = false
   view.value = 'projects'
   syncUrl('push')
+}
+
+function openAddTask() {
+  taskDraft.value = ''
+  taskLane.value = 'now'
+  addingTask.value = true
+}
+
+function closeAddTask() {
+  addingTask.value = false
+  taskDraft.value = ''
+  taskLane.value = 'now'
 }
 
 function openProjectInfoEdit() {
@@ -387,9 +403,14 @@ async function createProject() {
 async function createTask(project: Project) {
   const title = taskDraft.value.trim()
   if (!title) return
-  taskDraft.value = ''
-  const id = await addTask(project.id, title, taskLane.value)
+  const lane = taskLane.value
+  closeAddTask()
+  const id = await addTask(project.id, title, lane)
   if (id) editingTaskId.value = id
+}
+
+function onAddTaskBack(event: MouseEvent) {
+  if (event.target === event.currentTarget) closeAddTask()
 }
 
 async function addItem() {
@@ -1030,6 +1051,14 @@ function laneLabel(lane: Lane) {
             </a>
             <button
               v-if="!editingProjectInfo"
+              class="solid"
+              type="button"
+              @click="openAddTask"
+            >
+              Add task
+            </button>
+            <button
+              v-if="!editingProjectInfo"
               class="texty"
               type="button"
               @click="openProjectInfoEdit"
@@ -1086,19 +1115,6 @@ function laneLabel(lane: Lane) {
             <button class="texty" type="button" @click="closeProjectInfoEdit">Cancel</button>
             <button class="solid" type="button" @click="saveProjectInfo">Save</button>
           </div>
-        </div>
-
-        <div class="composer adder">
-          <form @submit.prevent="createTask(selected)">
-            <input v-model="taskDraft" aria-label="New task" placeholder="Add a task to the front of a lane" />
-            <select v-model="taskLane" aria-label="Lane">
-              <option value="now">Now</option>
-              <option value="next">Next</option>
-              <option value="later">Later</option>
-            </select>
-            <button class="solid" type="submit">Add</button>
-            <button class="texty" type="button" @click="capturing = true">From a photo</button>
-          </form>
         </div>
 
         <div class="project-filters">
@@ -1166,6 +1182,47 @@ function laneLabel(lane: Lane) {
         </div>
       </section>
     </main>
+    <div v-if="addingTask && selected" class="task-back" @click="onAddTaskBack">
+      <section class="task-sheet add-task-sheet" role="dialog" aria-labelledby="add-task-title" @click.stop>
+        <header class="task-sheet-head">
+          <div>
+            <p class="kicker">{{ selected.name }}</p>
+            <h2 id="add-task-title" class="display">Add task</h2>
+          </div>
+          <button class="texty" type="button" @click="closeAddTask">Close</button>
+        </header>
+        <form class="add-task-form" @submit.prevent="createTask(selected)">
+          <label class="field">
+            <span>Title</span>
+            <input
+              v-model="taskDraft"
+              aria-label="New task title"
+              placeholder="What needs to happen?"
+              required
+              autofocus
+            />
+          </label>
+          <div class="field">
+            <span>Lane</span>
+            <div class="lane-switch" role="group" aria-label="Lane">
+              <button
+                v-for="lane in lanes"
+                :key="lane"
+                type="button"
+                :aria-pressed="taskLane === lane"
+                @click="taskLane = lane"
+              >
+                {{ laneLabel(lane) }}
+              </button>
+            </div>
+          </div>
+          <div class="task-sheet-actions">
+            <button class="solid" type="submit">Add task</button>
+            <button class="texty" type="button" @click="capturing = true; closeAddTask()">From a photo</button>
+          </div>
+        </form>
+      </section>
+    </div>
     <CaptureSheet v-if="capturing" :project-id="selectedId" @close="capturing = false" @applied="onCaptured" />
     <TaskView v-if="editingTaskId" :task-id="editingTaskId" @close="editingTaskId = null" />
   </div>
