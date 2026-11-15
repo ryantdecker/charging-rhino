@@ -93,6 +93,7 @@ button { cursor: pointer; }
 .app-nav button[aria-current="page"] { background: var(--blue); color: white; }
 .app-nav button:hover { background: rgba(255, 255, 255, 0.06); }
 .app-nav button[aria-current="page"]:hover { background: #007ae0; }
+.nav-show-mobile { display: none !important; }
 .side nav { display: flex; flex-direction: column; gap: 4px; }
 .side .nav-heading {
   display: flex;
@@ -1147,6 +1148,12 @@ h2.display {
   .shell.with-side { grid-template-columns: 1fr; }
   .stat-row { grid-template-columns: 1fr; }
   .main > :not(.day-banner) { padding-inline: 16px; }
+  .day-banner {
+    margin: 0 0 18px;
+  }
+  .day-banner img {
+    object-fit: cover;
+  }
   .side-toggle {
     display: grid;
     place-items: center;
@@ -1196,7 +1203,11 @@ h2.display {
   .shell.side-open .side {
     transform: translateX(0);
   }
-  .main { padding: 22px 16px 48px; }
+  .nav-show-mobile { display: flex !important; }
+  .nav-show-desktop { display: none !important; }
+  .side-projects { display: none; }
+  .main { padding: 0 0 48px; }
+  .main > :first-child:not(.day-banner) { padding-top: 22px; }
   .lanes { grid-template-columns: 1fr; }
   .hero-band { align-items: flex-start; }
   .hero-band .filters { justify-content: flex-start; width: 100%; }

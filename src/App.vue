@@ -50,7 +50,7 @@ const overLane = ref<Lane | null>(null)
 const overTaskId = ref<string | null>(null)
 let taskWasDragged = false
 const capturing = ref(false)
-const view = ref<'home' | 'tasks' | 'goals' | 'calendar' | 'progress' | 'settings'>('home')
+const view = ref<'home' | 'projects' | 'tasks' | 'goals' | 'calendar' | 'progress' | 'settings'>('home')
 const sideOpen = ref(false)
 const horizon = ref<Horizon>('month')
 const activeTags = ref<string[]>([])
@@ -78,12 +78,13 @@ const horizonCopy: Record<Horizon, string> = {
   month: 'This month',
 }
 const nav = [
-  { id: 'home', label: 'Home' },
-  { id: 'tasks', label: 'Tasks' },
-  { id: 'goals', label: 'Goals' },
-  { id: 'calendar', label: 'Calendar' },
-  { id: 'progress', label: 'Progress' },
-  { id: 'settings', label: 'Settings' },
+  { id: 'home', label: 'Home', show: 'always' },
+  { id: 'projects', label: 'Projects', show: 'mobile' },
+  { id: 'tasks', label: 'Tasks', show: 'desktop' },
+  { id: 'goals', label: 'Goals', show: 'always' },
+  { id: 'calendar', label: 'Calendar', show: 'always' },
+  { id: 'progress', label: 'Progress', show: 'always' },
+  { id: 'settings', label: 'Settings', show: 'always' },
 ] as const
 
 const today = new Date().toLocaleDateString('en-US', {
@@ -178,6 +179,12 @@ function show(next: (typeof nav)[number]['id']) {
   closeSide()
 }
 
+function navCurrent(id: (typeof nav)[number]['id']): boolean {
+  if (id === 'projects') return view.value === 'projects' || view.value === 'tasks'
+  if (id === 'tasks') return view.value === 'tasks' || view.value === 'projects'
+  return view.value === id
+}
+
 function selectProject(id: string) {
   view.value = 'tasks'
   selectedId.value = id
@@ -185,6 +192,11 @@ function selectProject(id: string) {
   projectFilter.value = ''
   editingTaskId.value = null
   closeSide()
+}
+
+function clearProject() {
+  selectedId.value = null
+  view.value = 'projects'
 }
 
 function openTask(id: string) {
@@ -228,7 +240,7 @@ async function addItem() {
 
 function startAddProject() {
   addingProject.value = true
-  view.value = 'tasks'
+  view.value = 'projects'
   selectedId.value = null
 }
 
@@ -442,11 +454,14 @@ function laneLabel(lane: Lane) {
           v-for="item in nav"
           :key="item.id"
           type="button"
-          :aria-current="view === item.id ? 'page' : undefined"
+          class="nav-link"
+          :class="`nav-show-${item.show}`"
+          :aria-current="navCurrent(item.id) ? 'page' : undefined"
           @click="show(item.id)"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path v-if="item.id === 'home'" d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z" />
+            <path v-else-if="item.id === 'projects'" d="M4 6.5A1.5 1.5 0 0 1 5.5 5h4.2l1.3 1.5H18.5A1.5 1.5 0 0 1 20 8v9.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z" />
             <path v-else-if="item.id === 'tasks'" d="M8 6h12M8 12h12M8 18h12M4.5 6h.01M4.5 12h.01M4.5 18h.01" />
             <path v-else-if="item.id === 'calendar'" d="M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
             <path v-else-if="item.id === 'goals'" d="M6 20V4m0 0h9l-2 3 2 3H6" />
@@ -456,7 +471,7 @@ function laneLabel(lane: Lane) {
           {{ item.label }}
         </button>
       </nav>
-      <nav class="projects" aria-label="Projects">
+      <nav class="projects side-projects" aria-label="Projects">
         <div class="nav-heading">
           <p class="nav-label">Projects</p>
           <button class="nav-add" type="button" @click="startAddProject">Add</button>
@@ -659,10 +674,10 @@ function laneLabel(lane: Lane) {
         </div>
       </section>
 
-      <section v-else-if="view === 'tasks' && !selected" aria-labelledby="tasks-title">
-        <p class="kicker">Tasks</p>
+      <section v-else-if="view === 'projects' || (view === 'tasks' && !selected)" aria-labelledby="projects-title">
+        <p class="kicker">Projects</p>
         <div class="project-head">
-          <h2 id="tasks-title" class="display">Projects.</h2>
+          <h2 id="projects-title" class="display">Projects.</h2>
           <button v-if="!addingProject" class="solid" type="button" @click="addingProject = true">Add project</button>
         </div>
         <form v-if="addingProject" class="composer adder" @submit.prevent="createProject">
@@ -693,7 +708,7 @@ function laneLabel(lane: Lane) {
       </section>
 
       <section v-else-if="selected" :aria-labelledby="`project-${selected.id}`">
-        <button class="texty" type="button" @click="selectedId = null">All projects</button>
+        <button class="texty" type="button" @click="clearProject">All projects</button>
         <div class="project-head">
           <div>
             <p class="kicker">{{ selected.status === 'shelved' ? 'Shelved' : 'Open project' }}</p>
