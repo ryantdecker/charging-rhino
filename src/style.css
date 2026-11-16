@@ -1394,6 +1394,10 @@ a.solid {
   font-weight: 700;
 }
 .month button.outside { color: var(--ink-soft); background: transparent; }
+.month button.today {
+  border-color: color-mix(in srgb, var(--charge) 55%, var(--line));
+  font-weight: 800;
+}
 .month button.marked i {
   display: block;
   width: 8px;
@@ -1576,6 +1580,7 @@ a.solid {
 }
 .day-item .who { flex: 1; min-width: 0; }
 .day-done { margin-top: 28px; }
+.add-task-sheet .danger { color: #8d2f12; }
 .day-done h3 { margin: 0 0 10px; font-size: 1rem; }
 .day-preview {
   width: 100%;

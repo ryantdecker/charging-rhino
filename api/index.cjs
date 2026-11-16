@@ -7034,8 +7034,19 @@ function cleanCalendarTag(value) {
 function titleKey(title) {
   return title.trim().replace(/\s+/g, " ").toLowerCase();
 }
+function asDayIso(value, fallback = todayIso()) {
+  const raw = String(value ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return fallback;
+  const [y, m, d] = raw.split("-").map(Number);
+  const date = new Date(y, (m ?? 1) - 1, d ?? 1);
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  const iso = `${date.getFullYear()}-${month}-${day}`;
+  return iso === raw ? raw : fallback;
+}
 function makeDayItem(board, input) {
   const today = todayIso();
+  const plannedFor = asDayIso(input.plannedFor, today);
   const title = input.title.trim();
   if (!title) throw new Error("Name the item.");
   let kind = input.kind ?? "todo";
@@ -7055,13 +7066,13 @@ function makeDayItem(board, input) {
     kind,
     title,
     note: (input.note ?? "").trim(),
-    order: nextDayOrder(board, today),
+    order: nextDayOrder(board, plannedFor),
     done: false,
     doneAt: null,
     taskId,
     calendarTag: kind === "event" ? calendarTag : null,
     createdOn: today,
-    plannedFor: today
+    plannedFor
   };
 }
 async function readyBoard() {
@@ -7623,7 +7634,9 @@ ${block}` : block;
         res,
         200,
         await updateBoard((board) => {
-          rollDayItems(board.dayItems, todayIso());
+          const today = todayIso();
+          rollDayItems(board.dayItems, today);
+          const plannedFor = asDayIso(body.plannedFor, today);
           const kind = asDayKind2(body.kind);
           const taskId = typeof body.taskId === "string" ? body.taskId : null;
           const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : taskId ? board.tasks.find((item) => item.id === taskId)?.title ?? "" : "";
@@ -7632,7 +7645,8 @@ ${block}` : block;
               title,
               kind: taskId ? "task" : kind,
               note: typeof body.note === "string" ? body.note : "",
-              taskId
+              taskId,
+              plannedFor
             })
           );
         })
@@ -7646,6 +7660,7 @@ ${block}` : block;
         await updateBoard((board) => {
           const today = todayIso();
           rollDayItems(board.dayItems, today);
+          const plannedFor = asDayIso(body.plannedFor, today);
           const kind = asDayKind2(body.kind);
           const calendarTag = cleanCalendarTag(body.calendarTag);
           if (kind === "event" && !calendarTag) throw new Error("Tag the calendar this photo came from.");
@@ -7657,18 +7672,19 @@ ${block}` : block;
             board.dayItems = board.dayItems.filter((item) => {
               if (item.done || item.kind !== "event") return true;
               if ((item.calendarTag ?? "").toLowerCase() !== tagKey) return true;
+              if (item.plannedFor !== plannedFor) return true;
               return lineKeys.has(titleKey(item.title));
             });
           }
           const existingKeys = new Set(
             board.dayItems.filter(
-              (item) => !item.done && item.kind === "event" && (item.calendarTag ?? "").toLowerCase() === tagKey
+              (item) => !item.done && item.kind === "event" && item.plannedFor === plannedFor && (item.calendarTag ?? "").toLowerCase() === tagKey
             ).map((item) => titleKey(item.title))
           );
           for (const line of lines) {
             if (kind === "event" && existingKeys.has(titleKey(line))) continue;
             board.dayItems.push(
-              makeDayItem(board, { title: line, kind, note: "", calendarTag })
+              makeDayItem(board, { title: line, kind, note: "", calendarTag, plannedFor })
             );
             existingKeys.add(titleKey(line));
           }
@@ -7719,6 +7735,17 @@ ${block}` : block;
             if (typeof body.done === "boolean") {
               item.done = body.done;
               item.doneAt = body.done ? nowIso() : null;
+            }
+            if (body.plannedFor !== void 0) {
+              const plannedFor = asDayIso(body.plannedFor, item.plannedFor);
+              if (plannedFor !== item.plannedFor) {
+                item.plannedFor = plannedFor;
+                const siblings = board.dayItems.filter(
+                  (row) => row.plannedFor === plannedFor && row.id !== item.id
+                );
+                const orders = siblings.map((row) => row.order);
+                item.order = orders.length === 0 ? 0 : Math.max(...orders) + 1;
+              }
             }
           })
         );

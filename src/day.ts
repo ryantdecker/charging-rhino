@@ -7,6 +7,13 @@ export function todayIso(now = new Date()): string {
   return `${now.getFullYear()}-${month}-${day}`
 }
 
+export function isDayIso(value: string | null | undefined): value is string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [y, m, d] = value.split('-').map(Number)
+  const date = new Date(y, (m ?? 1) - 1, d ?? 1)
+  return todayIso(date) === value
+}
+
 export function formatDayLabel(iso: string, now = new Date()): string {
   if (iso === todayIso(now)) return 'Today'
   const [y, m, d] = iso.split('-').map(Number)

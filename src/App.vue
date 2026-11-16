@@ -9,6 +9,7 @@ import ProgressView from './ProgressView.vue'
 import SettingsView from './SettingsView.vue'
 import SplashLogin from './SplashLogin.vue'
 import TaskView from './TaskView.vue'
+import { isDayIso, todayIso } from './day'
 import { activeDayPart, greetingFor, watchDayPart } from './dayPart'
 import { hrefFor, navigate, parseLocation, type AppRoute, type GoalTab } from './route'
 import {
@@ -56,6 +57,7 @@ const overTaskId = ref<string | null>(null)
 let taskWasDragged = false
 const capturing = ref(false)
 const view = ref<'home' | 'projects' | 'tasks' | 'goals' | 'day' | 'calendar' | 'progress' | 'settings'>('home')
+const dayDate = ref(todayIso())
 const goalOpenId = ref<string | null>(null)
 const goalTab = ref<GoalTab>('journey')
 let ignoreRouteSync = false
@@ -215,7 +217,10 @@ function routeFromState(): AppRoute {
       goalTab: goalOpenId.value ? goalTab.value : undefined,
     }
   }
-  if (view.value === 'day') return { name: 'day' }
+  if (view.value === 'day') {
+    const today = todayIso()
+    return { name: 'day', date: dayDate.value !== today ? dayDate.value : undefined }
+  }
   if (view.value === 'calendar') return { name: 'calendar' }
   if (view.value === 'progress') return { name: 'progress' }
   return { name: 'settings' }
@@ -273,6 +278,7 @@ function applyRoute(route: AppRoute) {
     if (route.name === 'day') {
       view.value = 'day'
       selectedId.value = null
+      dayDate.value = isDayIso(route.date) ? route.date : todayIso()
       return
     }
     if (route.name === 'calendar') {
@@ -295,10 +301,19 @@ function applyRoute(route: AppRoute) {
 function show(next: (typeof nav)[number]['id']) {
   view.value = next
   selectedId.value = null
+  if (next === 'day') dayDate.value = todayIso()
   if (next !== 'goals') {
     goalOpenId.value = null
     goalTab.value = 'journey'
   }
+  closeSide()
+  syncUrl('push')
+}
+
+function openDay(date: string) {
+  dayDate.value = isDayIso(date) ? date : todayIso()
+  view.value = 'day'
+  selectedId.value = null
   closeSide()
   syncUrl('push')
 }
@@ -788,8 +803,8 @@ function laneLabel(lane: Lane) {
         v-model:open-id="goalOpenId"
         v-model:detail-tab="goalTab"
       />
-      <DayView v-else-if="view === 'day'" />
-      <CalendarView v-else-if="view === 'calendar'" />
+      <DayView v-else-if="view === 'day'" :date="dayDate" />
+      <CalendarView v-else-if="view === 'calendar'" @open-day="openDay" />
       <ProgressView v-else-if="view === 'progress'" />
       <SettingsView v-else-if="view === 'settings'" />
       <section v-else-if="view === 'home'" aria-labelledby="charge-title">

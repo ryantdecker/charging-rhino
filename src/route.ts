@@ -6,7 +6,7 @@ export type AppRoute =
   | { name: 'projects' }
   | { name: 'project'; projectKey: string }
   | { name: 'goals'; goalId?: string; goalTab?: GoalTab }
-  | { name: 'day' }
+  | { name: 'day'; date?: string }
   | { name: 'calendar' }
   | { name: 'progress' }
   | { name: 'settings' }
@@ -37,7 +37,10 @@ export function parseLocation(pathname = location.pathname, search = location.se
     if (key) return { name: 'goals', goalId: decodeURIComponent(key), goalTab: tab }
     return { name: 'goals', goalTab: tab }
   }
-  if (head === 'day') return { name: 'day' }
+  if (head === 'day') {
+    if (key && /^\d{4}-\d{2}-\d{2}$/.test(key)) return { name: 'day', date: key }
+    return { name: 'day' }
+  }
   if (head === 'calendar') return { name: 'calendar' }
   if (head === 'progress') return { name: 'progress' }
   if (head === 'settings') return { name: 'settings' }
@@ -61,8 +64,9 @@ export function hrefFor(route: AppRoute): string {
   else if (route.name === 'project') path = `/projects/${encodeURIComponent(route.projectKey)}`
   else if (route.name === 'goals') {
     path = route.goalId ? `/goals/${encodeURIComponent(route.goalId)}` : '/goals'
-  } else if (route.name === 'day') path = '/day'
-  else if (route.name === 'calendar') path = '/calendar'
+  } else if (route.name === 'day') {
+    path = route.date ? `/day/${encodeURIComponent(route.date)}` : '/day'
+  } else if (route.name === 'calendar') path = '/calendar'
   else if (route.name === 'progress') path = '/progress'
   else if (route.name === 'settings') path = '/settings'
 

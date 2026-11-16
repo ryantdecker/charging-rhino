@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { dayItemsFor, formatDayLabel, todayIso } from './day'
+import { dayItemsFor, formatDayLabel, isDayIso, todayIso } from './day'
 import {
   addDayItem,
   addDayLines,
@@ -13,11 +13,16 @@ import {
   projectById,
   readPhoto,
   removeDayItem,
+  renameDayItem,
+  setDayItemDate,
   setDayItemDone,
 } from './store'
 import { isActiveTask, type DayItem, type Task } from './types'
 
+const props = defineProps<{ date?: string }>()
+
 const today = todayIso()
+const focusDate = computed(() => (isDayIso(props.date) ? props.date : today))
 const draft = ref('')
 const pickingTask = ref(false)
 const capturing = ref(false)
@@ -27,14 +32,23 @@ const preview = ref('')
 const lines = ref<{ id: number; text: string; keep: boolean }[]>([])
 const calendarTag = ref(localStorage.getItem('rhino_calendar_tag') ?? '')
 const calendarTagDraft = ref('')
+const editingId = ref<string | null>(null)
+const editTitle = ref('')
+const editDate = ref('')
 const draggingId = ref<string | null>(null)
 const overId = ref<string | null>(null)
 let nextLineId = 1
+let itemWasDragged = false
 
-const agenda = computed(() => dayItemsFor(board.dayItems, today))
+const editingItem = computed(
+  () => board.dayItems.find((item) => item.id === editingId.value) ?? null,
+)
+
+const agenda = computed(() => dayItemsFor(board.dayItems, focusDate.value))
 const openAgenda = computed(() => agenda.value.filter((item) => !item.done))
 const doneAgenda = computed(() => agenda.value.filter((item) => item.done))
 const knownCalendars = computed(() => calendarTags())
+const isToday = computed(() => focusDate.value === today)
 
 const pinnedTaskIds = computed(
   () => new Set(board.dayItems.filter((item) => item.kind === 'task' && item.taskId && !item.done).map((item) => item.taskId!)),
@@ -59,7 +73,7 @@ const activeCalendarTag = computed(() => {
 })
 
 onMounted(() => {
-  void ensureDay()
+  if (isToday.value) void ensureDay()
   if (!calendarTag.value && knownCalendars.value[0]) {
     calendarTag.value = knownCalendars.value[0]
   }
@@ -82,25 +96,29 @@ function addTodo() {
   const title = draft.value.trim()
   if (!title) return
   draft.value = ''
-  addDayItem({ title, kind: 'todo' })
+  addDayItem({ title, kind: 'todo', plannedFor: focusDate.value })
 }
 
 function pinTask(task: Task) {
-  addDayItem({ title: task.title, kind: 'task', taskId: task.id })
+  addDayItem({ title: task.title, kind: 'task', taskId: task.id, plannedFor: focusDate.value })
   pickingTask.value = false
 }
 
 function clearDrag() {
   draggingId.value = null
   overId.value = null
+  window.setTimeout(() => {
+    itemWasDragged = false
+  }, 0)
 }
 
 function onDragStart(id: string, event: DragEvent) {
   const origin = event.target as HTMLElement | null
-  if (origin?.closest('button, input, a')) {
+  if (origin?.closest('button, input, a, label')) {
     event.preventDefault()
     return
   }
+  itemWasDragged = true
   draggingId.value = id
   event.dataTransfer?.setData('text/plain', id)
   if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
@@ -118,6 +136,46 @@ function onDropEnd() {
   clearDrag()
   if (!id) return
   placeDayItem(id, null)
+}
+
+function openEdit(item: DayItem) {
+  if (itemWasDragged) {
+    itemWasDragged = false
+    return
+  }
+  editingId.value = item.id
+  editTitle.value = item.title
+  editDate.value = item.plannedFor
+}
+
+function closeEdit() {
+  editingId.value = null
+  editTitle.value = ''
+  editDate.value = ''
+}
+
+function saveEdit() {
+  const item = editingItem.value
+  if (!item) return
+  const title = editTitle.value.trim()
+  if (!title) return
+  renameDayItem(item.id, title)
+  if (editDate.value && editDate.value !== item.plannedFor) {
+    setDayItemDate(item.id, editDate.value)
+  }
+  closeEdit()
+}
+
+function deleteEdit() {
+  const item = editingItem.value
+  if (!item) return
+  if (!window.confirm(`Delete “${item.title}”?`)) return
+  removeDayItem(item.id)
+  closeEdit()
+}
+
+function onEditBack(event: MouseEvent) {
+  if (event.target === event.currentTarget) closeEdit()
 }
 
 async function readAsDataUrl(file: File): Promise<string> {
@@ -208,7 +266,7 @@ function applyCapture() {
     return
   }
 
-  const missing = missingCalendarItems(tag, kept)
+  const missing = missingCalendarItems(tag, kept, focusDate.value)
   let removeMissing = false
   if (missing.length > 0) {
     const list = missing
@@ -217,7 +275,7 @@ function applyCapture() {
       .join('\n')
     const extra = missing.length > 8 ? `\n…and ${missing.length - 8} more` : ''
     const ok = window.confirm(
-      `These open items from “${tag}” are not in this photo.\n\n${list}${extra}\n\nRemove them from today?\n\nOK = remove · Cancel = keep them and only add new lines.`,
+      `These open items from “${tag}” are not in this photo.\n\n${list}${extra}\n\nRemove them from this day?\n\nOK = remove · Cancel = keep them and only add new lines.`,
     )
     removeMissing = ok
   }
@@ -225,7 +283,12 @@ function applyCapture() {
   localStorage.setItem('rhino_calendar_tag', tag)
   calendarTag.value = tag
   calendarTagDraft.value = ''
-  addDayLines(kept, { kind: 'event', calendarTag: tag, removeMissing })
+  addDayLines(kept, {
+    kind: 'event',
+    calendarTag: tag,
+    removeMissing,
+    plannedFor: focusDate.value,
+  })
   capturing.value = false
   preview.value = ''
   lines.value = []
@@ -254,8 +317,11 @@ function openCapture() {
     <p class="kicker">Day plan</p>
     <div class="project-head">
       <div>
-        <h2 id="day-title" class="display">{{ formatDayLabel(today) }}.</h2>
-        <p class="lede">Quick todos, a few project tasks, and lines from a calendar photo — unfinished rolls forward.</p>
+        <h2 id="day-title" class="display">{{ formatDayLabel(focusDate) }}.</h2>
+        <p class="lede">
+          Quick todos, a few project tasks, and lines from a calendar photo
+          <template v-if="isToday"> — unfinished rolls forward</template>.
+        </p>
       </div>
       <div class="actions">
         <button class="texty" type="button" @click="pickingTask = !pickingTask">
@@ -313,15 +379,15 @@ function openCapture() {
           <strong>{{ item.title }}</strong>
           <p class="meta">
             {{ kindLabel(item) }}
-            <template v-if="item.createdOn < today"> · carried</template>
+            <template v-if="item.createdOn < focusDate"> · carried</template>
           </p>
         </div>
-        <button class="texty" type="button" @click="removeDayItem(item.id)">Remove</button>
+        <button class="texty" type="button" @click.stop="openEdit(item)">Edit</button>
       </article>
     </div>
 
     <div v-if="doneAgenda.length" class="day-done">
-      <h3>Done today</h3>
+      <h3>{{ isToday ? 'Done today' : 'Done' }}</h3>
       <article v-for="item in doneAgenda" :key="item.id" class="row day-item done">
         <label class="day-check">
           <input type="checkbox" checked @change="setDayItemDone(item.id, false)" />
@@ -331,8 +397,34 @@ function openCapture() {
           <strong>{{ item.title }}</strong>
           <p class="meta">{{ kindLabel(item) }}</p>
         </div>
-        <button class="texty" type="button" @click="removeDayItem(item.id)">Remove</button>
+        <button class="texty" type="button" @click.stop="openEdit(item)">Edit</button>
       </article>
+    </div>
+
+    <div v-if="editingItem" class="task-back" @click="onEditBack">
+      <section class="task-sheet add-task-sheet" role="dialog" aria-labelledby="day-edit-title" @click.stop>
+        <header class="task-sheet-head">
+          <div>
+            <p class="kicker">{{ kindLabel(editingItem) }}</p>
+            <h2 id="day-edit-title" class="display">Edit item</h2>
+          </div>
+          <button class="texty" type="button" @click="closeEdit">Close</button>
+        </header>
+        <form class="add-task-form" @submit.prevent="saveEdit">
+          <label class="field">
+            <span>Text</span>
+            <input v-model="editTitle" aria-label="Item text" required autofocus />
+          </label>
+          <label class="field">
+            <span>Day</span>
+            <input v-model="editDate" type="date" aria-label="Assigned day" required />
+          </label>
+          <div class="task-sheet-actions">
+            <button class="solid" type="submit">Save</button>
+            <button class="texty danger" type="button" @click="deleteEdit">Delete</button>
+          </div>
+        </form>
+      </section>
     </div>
 
     <div v-if="capturing" class="task-back" @click.self="closeCapture">

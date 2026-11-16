@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { todayIso } from './day'
 import { board } from './store'
 
+const emit = defineEmits<{ 'open-day': [date: string] }>()
+
 const cursor = ref(new Date())
-const selected = ref<string | null>(null)
 
 const label = computed(() => cursor.value.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }))
+const today = todayIso()
 
 function iso(date: Date): string {
   const month = `${date.getMonth() + 1}`.padStart(2, '0')
@@ -29,6 +32,9 @@ const events = computed(() => {
   for (const project of board.projects) {
     if (project.lastTouched) add(project.lastTouched, `${project.name} touched`)
   }
+  for (const item of board.dayItems) {
+    add(item.plannedFor, item.title)
+  }
   return map
 })
 
@@ -46,18 +52,16 @@ const cells = computed(() => {
       day,
       number: date.getDate(),
       outside: date.getMonth() !== month,
+      today: day === today,
       count: events.value.get(day)?.length ?? 0,
     }
   })
 })
 
-const selectedLines = computed(() => (selected.value ? events.value.get(selected.value) ?? [] : []))
-
 function shift(amount: number) {
   const next = new Date(cursor.value)
   next.setMonth(next.getMonth() + amount)
   cursor.value = next
-  selected.value = null
 }
 </script>
 
@@ -71,6 +75,7 @@ function shift(amount: number) {
         <button class="texty" type="button" @click="shift(1)">Next</button>
       </div>
     </div>
+    <p class="lede">Open a day to plan it.</p>
     <div class="weekdays" aria-hidden="true">
       <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
     </div>
@@ -80,18 +85,13 @@ function shift(amount: number) {
         :key="cell.day"
         type="button"
         role="gridcell"
-        :class="{ outside: cell.outside, marked: cell.count > 0 }"
-        :aria-pressed="selected === cell.day"
-        :aria-label="`${cell.day}, ${cell.count} items`"
-        @click="selected = cell.day"
+        :class="{ outside: cell.outside, marked: cell.count > 0, today: cell.today }"
+        :aria-label="`Open ${cell.day}, ${cell.count} items`"
+        @click="emit('open-day', cell.day)"
       >
         {{ cell.number }}
         <i v-if="cell.count"></i>
       </button>
     </div>
-    <ul v-if="selected" class="day-list">
-      <li v-if="selectedLines.length === 0">Nothing recorded on {{ selected }}.</li>
-      <li v-for="line in selectedLines" :key="line">{{ line }}</li>
-    </ul>
   </section>
 </template>

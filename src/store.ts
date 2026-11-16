@@ -425,13 +425,19 @@ export function addDayItem(input: {
   kind?: DayItemKind
   note?: string
   taskId?: string | null
+  plannedFor?: string | null
 }): void {
   void commit('/api/day/items', { method: 'POST', body: input })
 }
 
 export function addDayLines(
   lines: string[],
-  options: { kind?: DayItemKind; calendarTag?: string | null; removeMissing?: boolean } = {},
+  options: {
+    kind?: DayItemKind
+    calendarTag?: string | null
+    removeMissing?: boolean
+    plannedFor?: string | null
+  } = {},
 ): void {
   void commit('/api/day/items/batch', {
     method: 'POST',
@@ -440,6 +446,7 @@ export function addDayLines(
       kind: options.kind ?? 'event',
       calendarTag: options.calendarTag ?? null,
       removeMissing: options.removeMissing === true,
+      plannedFor: options.plannedFor ?? null,
     },
   })
 }
@@ -463,13 +470,19 @@ function titleKey(title: string): string {
 }
 
 /** Open event items for a calendar tag that are missing from the incoming line set. */
-export function missingCalendarItems(calendarTag: string, lines: string[]): DayItem[] {
+export function missingCalendarItems(
+  calendarTag: string,
+  lines: string[],
+  plannedFor?: string | null,
+): DayItem[] {
   const tagKey = calendarTag.trim().toLowerCase()
   if (!tagKey) return []
   const lineKeys = new Set(lines.map(titleKey).filter(Boolean))
+  const day = plannedFor?.trim() || null
   return board.dayItems.filter((item) => {
     if (item.done || item.kind !== 'event') return false
     if ((item.calendarTag ?? '').toLowerCase() !== tagKey) return false
+    if (day && item.plannedFor !== day) return false
     return !lineKeys.has(titleKey(item.title))
   })
 }
@@ -481,6 +494,17 @@ export function setDayItemDone(id: string, done: boolean): void {
     item.doneAt = done ? new Date().toISOString() : null
   }
   void commit(`/api/day/items/${id}`, { method: 'PATCH', body: { done } })
+}
+
+export function setDayItemDate(id: string, plannedFor: string): void {
+  const item = board.dayItems.find((row) => row.id === id)
+  const day = plannedFor.trim()
+  if (!item || !/^\d{4}-\d{2}-\d{2}$/.test(day) || item.plannedFor === day) return
+  item.plannedFor = day
+  const siblings = board.dayItems.filter((row) => row.plannedFor === day && row.id !== id)
+  const orders = siblings.map((row) => row.order)
+  item.order = orders.length === 0 ? 0 : Math.max(...orders) + 1
+  void commit(`/api/day/items/${id}`, { method: 'PATCH', body: { plannedFor: day } })
 }
 
 export function renameDayItem(id: string, title: string): void {
