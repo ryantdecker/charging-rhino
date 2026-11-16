@@ -1606,6 +1606,12 @@ a.solid {
   display: grid;
   gap: 8px;
 }
+.day-pin-modal {
+  margin: 0;
+  max-height: min(50vh, 420px);
+  overflow: auto;
+}
+.add-photo-lede { margin: 0 0 4px; }
 .day-pin-row {
   cursor: pointer;
   text-align: left;

@@ -41,10 +41,11 @@ const emit = defineEmits<{ navigate: [target: { date: string; span: DaySpan }] }
 const today = todayIso()
 const focusDate = computed(() => (isDayIso(props.date) ? props.date : today))
 const isWeek = computed(() => props.span === 'week')
+type AddMethod = 'todo' | 'task' | 'photo'
+const adding = ref(false)
+const addMethod = ref<AddMethod>('todo')
 const draft = ref('')
 const draftTime = ref('')
-const pickingTask = ref(false)
-const capturing = ref(false)
 const reading = ref(false)
 const captureError = ref('')
 const preview = ref('')
@@ -140,18 +141,46 @@ function kindLabel(item: DayItem): string {
   return 'Todo'
 }
 
+function openAdd(method: AddMethod = 'todo') {
+  addMethod.value = method
+  draft.value = ''
+  draftTime.value = ''
+  captureError.value = ''
+  preview.value = ''
+  lines.value = []
+  if (!calendarTag.value && knownCalendars.value[0]) {
+    calendarTag.value = knownCalendars.value[0]
+  } else if (!calendarTag.value) {
+    calendarTag.value = '__new__'
+  }
+  adding.value = true
+}
+
+function closeAdd() {
+  adding.value = false
+  draft.value = ''
+  draftTime.value = ''
+  captureError.value = ''
+  preview.value = ''
+  lines.value = []
+  reading.value = false
+}
+
+function onAddBack(event: MouseEvent) {
+  if (event.target === event.currentTarget) closeAdd()
+}
+
 function addTodo() {
   const title = draft.value.trim()
   if (!title) return
   const time = asTime(draftTime.value)
-  draft.value = ''
-  draftTime.value = ''
   addDayItem({ title, kind: 'todo', plannedFor: focusDate.value, time })
+  closeAdd()
 }
 
 function pinTask(task: Task) {
   addDayItem({ title: task.title, kind: 'task', taskId: task.id, plannedFor: focusDate.value })
-  pickingTask.value = false
+  closeAdd()
 }
 
 function clearDrag() {
@@ -358,26 +387,7 @@ function applyCapture() {
     removeMissing,
     plannedFor: focusDate.value,
   })
-  capturing.value = false
-  preview.value = ''
-  lines.value = []
-  captureError.value = ''
-}
-
-function closeCapture() {
-  capturing.value = false
-  preview.value = ''
-  lines.value = []
-  captureError.value = ''
-}
-
-function openCapture() {
-  capturing.value = true
-  if (!calendarTag.value && knownCalendars.value[0]) {
-    calendarTag.value = knownCalendars.value[0]
-  } else if (!calendarTag.value) {
-    calendarTag.value = '__new__'
-  }
+  closeAdd()
 }
 </script>
 
@@ -394,10 +404,7 @@ function openCapture() {
         </p>
       </div>
       <div class="actions">
-        <button class="texty" type="button" @click="pickingTask = !pickingTask">
-          {{ pickingTask ? 'Hide tasks' : 'Pin a task' }}
-        </button>
-        <button class="solid" type="button" @click="openCapture">From a photo</button>
+        <button class="solid" type="button" @click="openAdd()">Add</button>
       </div>
     </div>
 
@@ -425,36 +432,6 @@ function openCapture() {
           Today
         </button>
       </div>
-    </div>
-
-    <form class="composer adder day-add" @submit.prevent="addTodo">
-      <input
-        v-model="draft"
-        aria-label="Quick todo"
-        :placeholder="isWeek ? `Add to ${formatDayHeading(focusDate)}` : 'Add a simple todo for this day'"
-      />
-      <input v-model="draftTime" type="time" aria-label="Optional time" />
-      <button class="solid" type="submit">Add</button>
-    </form>
-
-    <div v-if="pickingTask" class="day-pin-panel">
-      <p class="meta">
-        Pin an open project task onto {{ formatDayHeading(focusDate) }}. Checking it off here only clears the day plan.
-      </p>
-      <p v-if="pinCandidates.length === 0" class="empty">Nothing left to pin, or everything useful is already here.</p>
-      <button
-        v-for="task in pinCandidates"
-        :key="task.id"
-        class="row day-pin-row"
-        type="button"
-        @click="pinTask(task)"
-      >
-        <div class="who">
-          <strong>{{ task.title }}</strong>
-          <p class="meta">{{ projectById(task.projectId)?.name }} · {{ task.lane }}</p>
-        </div>
-        <span class="row-link">Pin</span>
-      </button>
     </div>
 
     <div v-if="isWeek" class="week-stack">
@@ -513,7 +490,7 @@ function openCapture() {
         @dragover.prevent
         @drop="onDropEnd"
       >
-        <p v-if="openAgenda.length === 0" class="empty">Nothing planned yet. Add a todo, pin a task, or read a calendar photo.</p>
+        <p v-if="openAgenda.length === 0" class="empty">Nothing planned yet. Tap Add to write a todo, pin a task, or read a photo.</p>
         <article
           v-for="item in openAgenda"
           :key="item.id"
@@ -592,51 +569,102 @@ function openCapture() {
       </section>
     </div>
 
-    <div v-if="capturing" class="task-back" @click.self="closeCapture">
-      <section class="task-sheet add-task-sheet" role="dialog" aria-labelledby="day-photo-title" @click.stop>
+    <div v-if="adding" class="task-back" @click="onAddBack">
+      <section class="task-sheet add-task-sheet" role="dialog" aria-labelledby="day-add-title" @click.stop>
         <header class="task-sheet-head">
           <div>
-            <p class="kicker">Day plan</p>
-            <h2 id="day-photo-title" class="display">From a photo</h2>
+            <p class="kicker">{{ formatDayHeading(focusDate) }}</p>
+            <h2 id="day-add-title" class="display">Add</h2>
           </div>
-          <button class="texty" type="button" @click="closeCapture">Close</button>
+          <button class="texty" type="button" @click="closeAdd">Close</button>
         </header>
-        <p class="lede">
-          Snap one calendar at a time and tag it (Kitchen, Work, Phone…). Removals only apply within that tag.
-        </p>
-        <label class="field">
-          <span>Calendar</span>
-          <select v-model="calendarTag" aria-label="Calendar tag">
-            <option v-for="tag in knownCalendars" :key="tag" :value="tag">{{ tag }}</option>
-            <option value="__new__">New calendar…</option>
-          </select>
-        </label>
-        <label v-if="calendarTag === '__new__'" class="field">
-          <span>Name</span>
-          <input
-            v-model="calendarTagDraft"
-            aria-label="New calendar name"
-            placeholder="e.g. Kitchen wall"
-            required
-          />
-        </label>
-        <label class="drop" :class="{ busy: reading }">
-          <span>{{ reading ? 'Reading…' : 'Drop or choose a photo' }}</span>
-          <input type="file" accept="image/*" capture="environment" @change="onPick" />
-        </label>
-        <img v-if="preview" class="day-preview" :src="preview" alt="" />
-        <p v-if="captureError" class="notice">{{ captureError }}</p>
-        <div v-if="lines.length" class="day-lines">
-          <label v-for="line in lines" :key="line.id" class="day-line">
-            <input v-model="line.keep" type="checkbox" />
-            <input v-model="line.text" aria-label="Line text" />
-          </label>
+
+        <div class="lane-switch" role="group" aria-label="How to add">
+          <button type="button" :aria-pressed="addMethod === 'todo'" @click="addMethod = 'todo'">Todo</button>
+          <button type="button" :aria-pressed="addMethod === 'task'" @click="addMethod = 'task'">Pin task</button>
+          <button type="button" :aria-pressed="addMethod === 'photo'" @click="addMethod = 'photo'">Photo</button>
         </div>
-        <div class="task-sheet-actions">
-          <button class="solid" type="button" :disabled="!lines.length" @click="applyCapture">Add to today</button>
-          <button class="texty" type="button" @click="lines.push({ id: nextLineId++, text: '', keep: true })">
-            Add a line
+
+        <form v-if="addMethod === 'todo'" class="add-task-form" @submit.prevent="addTodo">
+          <label class="field">
+            <span>Text</span>
+            <input
+              v-model="draft"
+              aria-label="Quick todo"
+              placeholder="What needs to happen?"
+              required
+              autofocus
+            />
+          </label>
+          <label class="field">
+            <span>Time</span>
+            <input v-model="draftTime" type="time" aria-label="Optional time" />
+          </label>
+          <div class="task-sheet-actions">
+            <button class="solid" type="submit">Add todo</button>
+          </div>
+        </form>
+
+        <div v-else-if="addMethod === 'task'" class="day-pin-panel day-pin-modal">
+          <p class="meta">
+            Pin an open project task onto {{ formatDayHeading(focusDate) }}. Checking it off here only clears the day plan unless you also close the task.
+          </p>
+          <p v-if="pinCandidates.length === 0" class="empty">Nothing left to pin, or everything useful is already here.</p>
+          <button
+            v-for="task in pinCandidates"
+            :key="task.id"
+            class="row day-pin-row"
+            type="button"
+            @click="pinTask(task)"
+          >
+            <div class="who">
+              <strong>{{ task.title }}</strong>
+              <p class="meta">{{ projectById(task.projectId)?.name }} · {{ task.lane }}</p>
+            </div>
+            <span class="row-link">Pin</span>
           </button>
+        </div>
+
+        <div v-else class="add-task-form">
+          <p class="lede add-photo-lede">
+            Snap one calendar at a time and tag it (Kitchen, Work, Phone…). Removals only apply within that tag.
+          </p>
+          <label class="field">
+            <span>Calendar</span>
+            <select v-model="calendarTag" aria-label="Calendar tag">
+              <option v-for="tag in knownCalendars" :key="tag" :value="tag">{{ tag }}</option>
+              <option value="__new__">New calendar…</option>
+            </select>
+          </label>
+          <label v-if="calendarTag === '__new__'" class="field">
+            <span>Name</span>
+            <input
+              v-model="calendarTagDraft"
+              aria-label="New calendar name"
+              placeholder="e.g. Kitchen wall"
+              required
+            />
+          </label>
+          <label class="drop" :class="{ busy: reading }">
+            <span>{{ reading ? 'Reading…' : 'Drop or choose a photo' }}</span>
+            <input type="file" accept="image/*" capture="environment" @change="onPick" />
+          </label>
+          <img v-if="preview" class="day-preview" :src="preview" alt="" />
+          <p v-if="captureError" class="notice">{{ captureError }}</p>
+          <div v-if="lines.length" class="day-lines">
+            <label v-for="line in lines" :key="line.id" class="day-line">
+              <input v-model="line.keep" type="checkbox" />
+              <input v-model="line.text" aria-label="Line text" />
+            </label>
+          </div>
+          <div class="task-sheet-actions">
+            <button class="solid" type="button" :disabled="!lines.length" @click="applyCapture">
+              Add to {{ formatDayHeading(focusDate) }}
+            </button>
+            <button class="texty" type="button" @click="lines.push({ id: nextLineId++, text: '', keep: true })">
+              Add a line
+            </button>
+          </div>
         </div>
       </section>
     </div>
