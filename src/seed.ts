@@ -235,6 +235,7 @@ export function createSeed(): Board {
     projects: structuredClone(projects),
     tasks: structuredClone(tasks),
     goals: [],
+    dayItems: [],
     prefs: structuredClone(defaultPrefs),
   }
 }

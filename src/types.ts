@@ -60,6 +60,27 @@ export interface Goal {
   milestones: Milestone[]
 }
 
+/** Lightweight day-plan row — not a project task unless kind is task. */
+export type DayItemKind = 'todo' | 'task' | 'event'
+
+export interface DayItem {
+  id: string
+  kind: DayItemKind
+  title: string
+  note: string
+  order: number
+  done: boolean
+  doneAt: string | null
+  /** Set when kind is task — references a board task without owning it. */
+  taskId: string | null
+  /** Calendar source label for photo-imported events (e.g. "Kitchen", "Work"). */
+  calendarTag: string | null
+  /** YYYY-MM-DD the item was first created. */
+  createdOn: string
+  /** YYYY-MM-DD it currently sits on; unfinished items roll forward. */
+  plannedFor: string
+}
+
 export interface SyncReport {
   at: string
   added: number
@@ -74,6 +95,7 @@ export interface Board {
   projects: Project[]
   tasks: Task[]
   goals: Goal[]
+  dayItems: DayItem[]
   prefs: Prefs
 }
 

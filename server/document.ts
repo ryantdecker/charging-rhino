@@ -1,6 +1,7 @@
 import { createSeed } from '../src/seed.ts'
 import { guessAssist } from '../src/assist.ts'
-import type { Board, Horizon, Prefs, Task, TaskStatus } from '../src/types.ts'
+import type { Board, DayItem, DayItemKind, Horizon, Prefs, Task, TaskStatus } from '../src/types.ts'
+import { todayIso } from '../src/day.ts'
 import { loadRawBoard, saveBoardIfRevision, saveRawBoard, storeKind } from './board-store.ts'
 
 export { dataFile } from './board-store.ts'
@@ -53,11 +54,49 @@ function migrateTaskStatus(task: Task & { done?: boolean }): TaskStatus {
   return 'open'
 }
 
+function asDayKind(value: unknown): DayItemKind {
+  if (value === 'task' || value === 'event' || value === 'todo') return value
+  return 'todo'
+}
+
+function normalizeDayItem(raw: Partial<DayItem> & { id?: string }, fallbackDay: string): DayItem | null {
+  const id = String(raw.id ?? '').trim()
+  const title = String(raw.title ?? '').trim()
+  if (!id || !title) return null
+  const plannedFor = /^\d{4}-\d{2}-\d{2}$/.test(String(raw.plannedFor ?? ''))
+    ? String(raw.plannedFor)
+    : fallbackDay
+  const createdOn = /^\d{4}-\d{2}-\d{2}$/.test(String(raw.createdOn ?? ''))
+    ? String(raw.createdOn)
+    : plannedFor
+  const calendarTagRaw = String(raw.calendarTag ?? '').trim().replace(/\s+/g, ' ')
+  return {
+    id,
+    kind: asDayKind(raw.kind),
+    title,
+    note: String(raw.note ?? '').trim(),
+    order: Number.isFinite(Number(raw.order)) ? Number(raw.order) : 0,
+    done: raw.done === true,
+    doneAt: raw.done === true ? (raw.doneAt ?? null) : null,
+    taskId: raw.taskId ? String(raw.taskId) : null,
+    calendarTag: calendarTagRaw || null,
+    createdOn,
+    plannedFor,
+  }
+}
+
 export function normalize(board: Board): Board {
   board.revision ??= 1
   board.syncedAt ??= null
   board.lastSync ??= null
   if (!Array.isArray(board.goals)) board.goals = []
+  const fallbackDay = todayIso()
+  if (!Array.isArray(board.dayItems)) board.dayItems = []
+  else {
+    board.dayItems = board.dayItems
+      .map((item) => normalizeDayItem(item, fallbackDay))
+      .filter((item): item is DayItem => item !== null)
+  }
   for (const project of board.projects) {
     if (!Array.isArray(project.tags)) project.tags = starterTags[project.id] ?? []
   }

@@ -726,7 +726,8 @@ a.row-link { display: inline; }
   text-transform: uppercase;
   color: var(--ink-soft);
 }
-.add-task-form input {
+.add-task-form input,
+.add-task-form select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -1525,6 +1526,79 @@ a.solid {
   .goal-grid { grid-template-columns: 1fr; }
   .journey-card { margin-inline: 12px; }
   .journey-scene { aspect-ratio: 4 / 3; }
+}
+
+.day-add { margin-top: 8px; }
+.day-pin-panel {
+  margin: 14px 0 8px;
+  display: grid;
+  gap: 8px;
+}
+.day-pin-row {
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.day-agenda {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+  min-height: 80px;
+}
+.day-item {
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  grid-template-columns: unset;
+}
+.day-item.done {
+  cursor: default;
+  opacity: 0.72;
+}
+.day-item.done strong { text-decoration: line-through; }
+.day-item.dragging { opacity: 0.4; }
+.day-item.over { box-shadow: inset 0 3px 0 var(--charge); }
+.day-check {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.day-check input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--charge);
+}
+.day-item .who { flex: 1; min-width: 0; }
+.day-done { margin-top: 28px; }
+.day-done h3 { margin: 0 0 10px; font-size: 1rem; }
+.day-preview {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin: 8px 0;
+}
+.day-lines { display: grid; gap: 8px; margin: 10px 0; }
+.day-line {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.day-line input[type='text'],
+.day-line input:not([type]) {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: white;
+  color: var(--ink);
 }
 
 @media (prefers-reduced-motion: reduce) {

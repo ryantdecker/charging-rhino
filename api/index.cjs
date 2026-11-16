@@ -6719,8 +6719,29 @@ function createSeed() {
     projects: structuredClone(projects),
     tasks: structuredClone(tasks),
     goals: [],
+    dayItems: [],
     prefs: structuredClone(defaultPrefs)
   };
+}
+
+// src/day.ts
+function todayIso(now = /* @__PURE__ */ new Date()) {
+  const month = `${now.getMonth() + 1}`.padStart(2, "0");
+  const day = `${now.getDate()}`.padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+function rollDayItems(items, today = todayIso()) {
+  const openPast = items.filter((item) => !item.done && item.plannedFor < today).sort((a, b) => a.plannedFor.localeCompare(b.plannedFor) || a.order - b.order);
+  if (openPast.length === 0) return false;
+  const alreadyToday = items.filter((item) => item.plannedFor === today).sort((a, b) => a.order - b.order);
+  openPast.forEach((item, index) => {
+    item.plannedFor = today;
+    item.order = index;
+  });
+  alreadyToday.forEach((item, index) => {
+    item.order = openPast.length + index;
+  });
+  return true;
 }
 
 // server/board-store.ts
@@ -6831,11 +6852,41 @@ function migrateTaskStatus(task3) {
   if (task3.done === true) return "done";
   return "open";
 }
+function asDayKind(value) {
+  if (value === "task" || value === "event" || value === "todo") return value;
+  return "todo";
+}
+function normalizeDayItem(raw, fallbackDay) {
+  const id = String(raw.id ?? "").trim();
+  const title = String(raw.title ?? "").trim();
+  if (!id || !title) return null;
+  const plannedFor = /^\d{4}-\d{2}-\d{2}$/.test(String(raw.plannedFor ?? "")) ? String(raw.plannedFor) : fallbackDay;
+  const createdOn = /^\d{4}-\d{2}-\d{2}$/.test(String(raw.createdOn ?? "")) ? String(raw.createdOn) : plannedFor;
+  const calendarTagRaw = String(raw.calendarTag ?? "").trim().replace(/\s+/g, " ");
+  return {
+    id,
+    kind: asDayKind(raw.kind),
+    title,
+    note: String(raw.note ?? "").trim(),
+    order: Number.isFinite(Number(raw.order)) ? Number(raw.order) : 0,
+    done: raw.done === true,
+    doneAt: raw.done === true ? raw.doneAt ?? null : null,
+    taskId: raw.taskId ? String(raw.taskId) : null,
+    calendarTag: calendarTagRaw || null,
+    createdOn,
+    plannedFor
+  };
+}
 function normalize(board) {
   board.revision ??= 1;
   board.syncedAt ??= null;
   board.lastSync ??= null;
   if (!Array.isArray(board.goals)) board.goals = [];
+  const fallbackDay = todayIso();
+  if (!Array.isArray(board.dayItems)) board.dayItems = [];
+  else {
+    board.dayItems = board.dayItems.map((item) => normalizeDayItem(item, fallbackDay)).filter((item) => item !== null);
+  }
   for (const project of board.projects) {
     if (!Array.isArray(project.tags)) project.tags = starterTags[project.id] ?? [];
   }
@@ -6968,6 +7019,51 @@ function parseStatusPatch(body) {
 }
 
 // server/handle.ts
+function asDayKind2(value) {
+  if (value === "task" || value === "event" || value === "todo") return value;
+  return "todo";
+}
+function nextDayOrder(board, date) {
+  const orders = board.dayItems.filter((item) => item.plannedFor === date).map((item) => item.order);
+  return orders.length === 0 ? 0 : Math.max(...orders) + 1;
+}
+function cleanCalendarTag(value) {
+  const tag = String(value ?? "").trim().replace(/\s+/g, " ");
+  return tag || null;
+}
+function titleKey(title) {
+  return title.trim().replace(/\s+/g, " ").toLowerCase();
+}
+function makeDayItem(board, input) {
+  const today = todayIso();
+  const title = input.title.trim();
+  if (!title) throw new Error("Name the item.");
+  let kind = input.kind ?? "todo";
+  let taskId = input.taskId ?? null;
+  let calendarTag = cleanCalendarTag(input.calendarTag);
+  if (taskId) {
+    const task3 = board.tasks.find((item) => item.id === taskId);
+    if (!task3) throw new Error("Unknown task");
+    kind = "task";
+    calendarTag = null;
+  } else {
+    taskId = null;
+  }
+  if (kind !== "event") calendarTag = kind === "todo" ? null : calendarTag;
+  return {
+    id: crypto.randomUUID(),
+    kind,
+    title,
+    note: (input.note ?? "").trim(),
+    order: nextDayOrder(board, today),
+    done: false,
+    doneAt: null,
+    taskId,
+    calendarTag: kind === "event" ? calendarTag : null,
+    createdOn: today,
+    plannedFor: today
+  };
+}
 async function readyBoard() {
   return readBoard();
 }
@@ -7101,6 +7197,11 @@ async function handleApi(req, res) {
           board.projects.splice(0, board.projects.length, ...incoming.projects);
           board.tasks.splice(0, board.tasks.length, ...incoming.tasks);
           board.goals.splice(0, board.goals.length, ...Array.isArray(incoming.goals) ? incoming.goals : []);
+          board.dayItems.splice(
+            0,
+            board.dayItems.length,
+            ...Array.isArray(incoming.dayItems) ? incoming.dayItems : []
+          );
           if (incoming.prefs) board.prefs = structuredClone(incoming.prefs);
           board.syncedAt = incoming.syncedAt ?? null;
           board.lastSync = incoming.lastSync ?? null;
@@ -7117,6 +7218,7 @@ async function handleApi(req, res) {
           board.projects.splice(0, board.projects.length, ...seed.projects);
           board.tasks.splice(0, board.tasks.length, ...seed.tasks);
           board.goals.splice(0, board.goals.length, ...seed.goals);
+          board.dayItems.splice(0, board.dayItems.length, ...seed.dayItems);
           board.prefs = structuredClone(seed.prefs);
           board.syncedAt = null;
           board.lastSync = null;
@@ -7505,6 +7607,154 @@ ${block}` : block;
         })
       );
       return true;
+    }
+    if (method === "POST" && url.pathname === "/api/day/ensure") {
+      send(
+        res,
+        200,
+        await updateBoard((board) => {
+          rollDayItems(board.dayItems, todayIso());
+        })
+      );
+      return true;
+    }
+    if (method === "POST" && url.pathname === "/api/day/items") {
+      send(
+        res,
+        200,
+        await updateBoard((board) => {
+          rollDayItems(board.dayItems, todayIso());
+          const kind = asDayKind2(body.kind);
+          const taskId = typeof body.taskId === "string" ? body.taskId : null;
+          const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : taskId ? board.tasks.find((item) => item.id === taskId)?.title ?? "" : "";
+          board.dayItems.push(
+            makeDayItem(board, {
+              title,
+              kind: taskId ? "task" : kind,
+              note: typeof body.note === "string" ? body.note : "",
+              taskId
+            })
+          );
+        })
+      );
+      return true;
+    }
+    if (method === "POST" && url.pathname === "/api/day/items/batch") {
+      send(
+        res,
+        200,
+        await updateBoard((board) => {
+          const today = todayIso();
+          rollDayItems(board.dayItems, today);
+          const kind = asDayKind2(body.kind);
+          const calendarTag = cleanCalendarTag(body.calendarTag);
+          if (kind === "event" && !calendarTag) throw new Error("Tag the calendar this photo came from.");
+          const lines = Array.isArray(body.lines) ? body.lines.map((line) => String(line).trim()).filter((line) => line.length > 1) : [];
+          if (lines.length === 0) throw new Error("Nothing to add.");
+          const lineKeys = new Set(lines.map(titleKey));
+          const tagKey = calendarTag?.toLowerCase() ?? "";
+          if (kind === "event" && body.removeMissing === true && calendarTag) {
+            board.dayItems = board.dayItems.filter((item) => {
+              if (item.done || item.kind !== "event") return true;
+              if ((item.calendarTag ?? "").toLowerCase() !== tagKey) return true;
+              return lineKeys.has(titleKey(item.title));
+            });
+          }
+          const existingKeys = new Set(
+            board.dayItems.filter(
+              (item) => !item.done && item.kind === "event" && (item.calendarTag ?? "").toLowerCase() === tagKey
+            ).map((item) => titleKey(item.title))
+          );
+          for (const line of lines) {
+            if (kind === "event" && existingKeys.has(titleKey(line))) continue;
+            board.dayItems.push(
+              makeDayItem(board, { title: line, kind, note: "", calendarTag })
+            );
+            existingKeys.add(titleKey(line));
+          }
+        })
+      );
+      return true;
+    }
+    if (method === "POST" && url.pathname === "/api/day/reorder") {
+      send(
+        res,
+        200,
+        await updateBoard((board) => {
+          const today = todayIso();
+          rollDayItems(board.dayItems, today);
+          const orderedIds = Array.isArray(body.orderedIds) ? body.orderedIds.map((id) => String(id)) : [];
+          const open = board.dayItems.filter((item) => item.plannedFor === today && !item.done).sort((a, b) => a.order - b.order);
+          const byId = new Map(open.map((item) => [item.id, item]));
+          const next = [];
+          for (const id of orderedIds) {
+            const item = byId.get(id);
+            if (!item) continue;
+            next.push(item);
+            byId.delete(id);
+          }
+          next.push(...byId.values());
+          next.forEach((item, order) => {
+            item.order = order;
+          });
+        })
+      );
+      return true;
+    }
+    if (parts[0] === "api" && parts[1] === "day" && parts[2] === "items" && parts[3]) {
+      const itemId = parts[3];
+      if (method === "PATCH" && parts.length === 4) {
+        send(
+          res,
+          200,
+          await updateBoard((board) => {
+            const item = board.dayItems.find((row) => row.id === itemId);
+            if (!item) throw new Error("Unknown day item");
+            if (typeof body.title === "string") {
+              const title = body.title.trim();
+              if (!title) throw new Error("Name the item.");
+              item.title = title;
+            }
+            if (typeof body.note === "string") item.note = body.note.trim();
+            if (typeof body.done === "boolean") {
+              item.done = body.done;
+              item.doneAt = body.done ? nowIso() : null;
+            }
+          })
+        );
+        return true;
+      }
+      if (method === "DELETE" && parts.length === 4) {
+        send(
+          res,
+          200,
+          await updateBoard((board) => {
+            board.dayItems = board.dayItems.filter((item) => item.id !== itemId);
+          })
+        );
+        return true;
+      }
+      if (method === "POST" && parts[4] === "place" && parts.length === 5) {
+        send(
+          res,
+          200,
+          await updateBoard((board) => {
+            const today = todayIso();
+            rollDayItems(board.dayItems, today);
+            const item = board.dayItems.find((row) => row.id === itemId);
+            if (!item || item.done) throw new Error("Unknown day item");
+            const beforeId = typeof body.beforeId === "string" ? body.beforeId : null;
+            const siblings = board.dayItems.filter((row) => row.plannedFor === today && !row.done && row.id !== item.id).sort((a, b) => a.order - b.order);
+            const index = beforeId ? siblings.findIndex((row) => row.id === beforeId) : siblings.length;
+            siblings.splice(index < 0 ? siblings.length : index, 0, item);
+            siblings.forEach((row, order) => {
+              row.order = order;
+            });
+            item.plannedFor = today;
+          })
+        );
+        return true;
+      }
     }
     if (method === "POST" && url.pathname === "/api/goals") {
       send(

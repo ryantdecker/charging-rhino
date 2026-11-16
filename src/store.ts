@@ -1,5 +1,5 @@
 import { reactive, ref } from 'vue'
-import type { Board, Goal, Horizon, Lane, Project, Task, TaskStatus } from './types'
+import type { Board, DayItem, DayItemKind, Goal, Horizon, Lane, Project, Task, TaskStatus } from './types'
 import { isActiveTask } from './types'
 
 const laneWeight: Record<Lane, number> = { now: 0, next: 1, later: 2 }
@@ -11,6 +11,7 @@ export const board = reactive<Board>({
   projects: [],
   tasks: [],
   goals: [],
+  dayItems: [],
   prefs: { defaultHorizon: 'month', tags: [] },
 })
 
@@ -43,6 +44,7 @@ function apply(next: Board) {
   board.projects.splice(0, board.projects.length, ...next.projects)
   board.tasks.splice(0, board.tasks.length, ...next.tasks)
   board.goals.splice(0, board.goals.length, ...(next.goals ?? []))
+  board.dayItems.splice(0, board.dayItems.length, ...(next.dayItems ?? []))
   board.prefs.defaultHorizon = next.prefs?.defaultHorizon ?? 'month'
   board.prefs.tags.splice(0, board.prefs.tags.length, ...(next.prefs?.tags ?? []))
 }
@@ -412,6 +414,106 @@ export function toggleMilestone(goalId: string, milestoneId: string): void {
   const finished = goal.milestones.length > 0 && goal.milestones.every((item) => item.done)
   goal.status = finished ? 'completed' : 'active'
   void commit(`/api/goals/${goalId}/milestones/${milestoneId}`, { method: 'PATCH', body: { done: milestone.done } })
+}
+
+export async function ensureDay(): Promise<void> {
+  await commit('/api/day/ensure', { method: 'POST' })
+}
+
+export function addDayItem(input: {
+  title: string
+  kind?: DayItemKind
+  note?: string
+  taskId?: string | null
+}): void {
+  void commit('/api/day/items', { method: 'POST', body: input })
+}
+
+export function addDayLines(
+  lines: string[],
+  options: { kind?: DayItemKind; calendarTag?: string | null; removeMissing?: boolean } = {},
+): void {
+  void commit('/api/day/items/batch', {
+    method: 'POST',
+    body: {
+      lines,
+      kind: options.kind ?? 'event',
+      calendarTag: options.calendarTag ?? null,
+      removeMissing: options.removeMissing === true,
+    },
+  })
+}
+
+export function calendarTags(): string[] {
+  const seen = new Set<string>()
+  const tags: string[] = []
+  for (const item of board.dayItems) {
+    const tag = item.calendarTag?.trim()
+    if (!tag) continue
+    const key = tag.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    tags.push(tag)
+  }
+  return tags.sort((a, b) => a.localeCompare(b))
+}
+
+function titleKey(title: string): string {
+  return title.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+/** Open event items for a calendar tag that are missing from the incoming line set. */
+export function missingCalendarItems(calendarTag: string, lines: string[]): DayItem[] {
+  const tagKey = calendarTag.trim().toLowerCase()
+  if (!tagKey) return []
+  const lineKeys = new Set(lines.map(titleKey).filter(Boolean))
+  return board.dayItems.filter((item) => {
+    if (item.done || item.kind !== 'event') return false
+    if ((item.calendarTag ?? '').toLowerCase() !== tagKey) return false
+    return !lineKeys.has(titleKey(item.title))
+  })
+}
+
+export function setDayItemDone(id: string, done: boolean): void {
+  const item = board.dayItems.find((row) => row.id === id)
+  if (item) {
+    item.done = done
+    item.doneAt = done ? new Date().toISOString() : null
+  }
+  void commit(`/api/day/items/${id}`, { method: 'PATCH', body: { done } })
+}
+
+export function renameDayItem(id: string, title: string): void {
+  const item = board.dayItems.find((row) => row.id === id)
+  const clean = title.trim()
+  if (!item || !clean) return
+  item.title = clean
+  void commit(`/api/day/items/${id}`, { method: 'PATCH', body: { title: clean } })
+}
+
+export function removeDayItem(id: string): void {
+  const index = board.dayItems.findIndex((row) => row.id === id)
+  if (index >= 0) board.dayItems.splice(index, 1)
+  void commit(`/api/day/items/${id}`, { method: 'DELETE' })
+}
+
+export function placeDayItem(id: string, beforeId: string | null): void {
+  const item = board.dayItems.find((row) => row.id === id)
+  if (!item || item.done || beforeId === id) return
+  const today = item.plannedFor
+  const siblings = board.dayItems
+    .filter((row) => row.plannedFor === today && !row.done && row.id !== id)
+    .sort((a, b) => a.order - b.order)
+  const index = beforeId ? siblings.findIndex((row) => row.id === beforeId) : siblings.length
+  siblings.splice(index < 0 ? siblings.length : index, 0, item)
+  siblings.forEach((row, order) => {
+    row.order = order
+  })
+  void commit(`/api/day/items/${id}/place`, { method: 'POST', body: { beforeId } })
+}
+
+export function dayItemById(id: string): DayItem | undefined {
+  return board.dayItems.find((row) => row.id === id)
 }
 
 export function resetBoard(): void {
