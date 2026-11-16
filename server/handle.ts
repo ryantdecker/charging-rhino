@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createSeed } from '../src/seed.ts'
 import { guessAssist } from '../src/assist.ts'
-import { rollDayItems, todayIso } from '../src/day.ts'
+import { asTime, rollDayItems, todayIso } from '../src/day.ts'
 import type { Board, DayItem, DayItemKind, Goal, Horizon, Lane, ProjectStatus } from '../src/types.ts'
 import { cleanTags, readBoard, updateBoard } from './document.ts'
 import { authEnabled, clearAuthCookie, isAuthorized, setAuthCookie } from './auth.ts'
@@ -48,6 +48,7 @@ function makeDayItem(
     taskId?: string | null
     calendarTag?: string | null
     plannedFor?: string | null
+    time?: string | null
   },
 ): DayItem {
   const today = todayIso()
@@ -76,6 +77,7 @@ function makeDayItem(
     doneAt: null,
     taskId,
     calendarTag: kind === 'event' ? calendarTag : null,
+    time: asTime(input.time),
     createdOn: today,
     plannedFor,
   }
@@ -692,6 +694,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
               note: typeof body.note === 'string' ? body.note : '',
               taskId,
               plannedFor,
+              time: typeof body.time === 'string' ? body.time : null,
             }),
           )
         }),
@@ -797,6 +800,9 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
             if (typeof body.done === 'boolean') {
               item.done = body.done
               item.doneAt = body.done ? nowIso() : null
+            }
+            if (body.time !== undefined) {
+              item.time = body.time === null || body.time === '' ? null : asTime(String(body.time))
             }
             if (body.plannedFor !== undefined) {
               const plannedFor = asDayIso(body.plannedFor, item.plannedFor)

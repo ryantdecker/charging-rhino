@@ -1,14 +1,22 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { todayIso } from './day'
+import { computed, ref, watch } from 'vue'
+import { isDayIso, parseDayIso, todayIso } from './day'
 import { board } from './store'
 
+const props = defineProps<{ focusDate?: string }>()
 const emit = defineEmits<{ 'open-day': [date: string] }>()
 
-const cursor = ref(new Date())
+const today = todayIso()
+const cursor = ref(parseDayIso(isDayIso(props.focusDate) ? props.focusDate! : today))
+
+watch(
+  () => props.focusDate,
+  (value) => {
+    if (isDayIso(value)) cursor.value = parseDayIso(value)
+  },
+)
 
 const label = computed(() => cursor.value.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }))
-const today = todayIso()
 
 function iso(date: Date): string {
   const month = `${date.getMonth() + 1}`.padStart(2, '0')
@@ -67,7 +75,6 @@ function shift(amount: number) {
 
 <template>
   <section aria-labelledby="calendar-title">
-    <p class="kicker">Calendar</p>
     <div class="project-head">
       <h2 id="calendar-title" class="display">{{ label }}</h2>
       <div class="actions">

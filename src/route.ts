@@ -1,4 +1,5 @@
 export type GoalTab = 'journey' | 'progress'
+export type DaySpan = 'day' | 'week' | 'month'
 
 export type AppRoute =
   | { name: 'home' }
@@ -6,8 +7,7 @@ export type AppRoute =
   | { name: 'projects' }
   | { name: 'project'; projectKey: string }
   | { name: 'goals'; goalId?: string; goalTab?: GoalTab }
-  | { name: 'day'; date?: string }
-  | { name: 'calendar' }
+  | { name: 'calendar'; date?: string; span?: DaySpan }
   | { name: 'progress' }
   | { name: 'settings' }
 
@@ -17,10 +17,16 @@ function cleanSearch(search: string): URLSearchParams {
   return params
 }
 
+function parseSpan(value: string | null): DaySpan | undefined {
+  if (value === 'week' || value === 'month' || value === 'day') return value
+  return undefined
+}
+
 export function parseLocation(pathname = location.pathname, search = location.search): AppRoute {
   const parts = pathname.replace(/\/+$/, '').split('/').filter(Boolean)
   const params = cleanSearch(search)
   const tab = params.get('tab') === 'progress' ? 'progress' : params.get('tab') === 'journey' ? 'journey' : undefined
+  const span = parseSpan(params.get('span'))
 
   if (parts.length === 0) return { name: 'home' }
 
@@ -37,11 +43,11 @@ export function parseLocation(pathname = location.pathname, search = location.se
     if (key) return { name: 'goals', goalId: decodeURIComponent(key), goalTab: tab }
     return { name: 'goals', goalTab: tab }
   }
-  if (head === 'day') {
-    if (key && /^\d{4}-\d{2}-\d{2}$/.test(key)) return { name: 'day', date: key }
-    return { name: 'day' }
+  // /day and /calendar both land on the calendar surface.
+  if (head === 'day' || head === 'calendar') {
+    if (key && /^\d{4}-\d{2}-\d{2}$/.test(key)) return { name: 'calendar', date: key, span }
+    return { name: 'calendar', span }
   }
-  if (head === 'calendar') return { name: 'calendar' }
   if (head === 'progress') return { name: 'progress' }
   if (head === 'settings') return { name: 'settings' }
   if (head === 'home') return { name: 'home' }
@@ -57,6 +63,8 @@ export function hrefFor(route: AppRoute): string {
   } else {
     params.delete('tab')
   }
+  if (route.name === 'calendar' && route.span && route.span !== 'day') params.set('span', route.span)
+  else params.delete('span')
 
   let path = '/'
   if (route.name === 'tasks') path = '/tasks'
@@ -64,10 +72,9 @@ export function hrefFor(route: AppRoute): string {
   else if (route.name === 'project') path = `/projects/${encodeURIComponent(route.projectKey)}`
   else if (route.name === 'goals') {
     path = route.goalId ? `/goals/${encodeURIComponent(route.goalId)}` : '/goals'
-  } else if (route.name === 'day') {
-    path = route.date ? `/day/${encodeURIComponent(route.date)}` : '/day'
-  } else if (route.name === 'calendar') path = '/calendar'
-  else if (route.name === 'progress') path = '/progress'
+  } else if (route.name === 'calendar') {
+    path = route.date ? `/calendar/${encodeURIComponent(route.date)}` : '/calendar'
+  } else if (route.name === 'progress') path = '/progress'
   else if (route.name === 'settings') path = '/settings'
 
   const query = params.toString()

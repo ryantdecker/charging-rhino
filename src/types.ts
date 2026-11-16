@@ -75,6 +75,8 @@ export interface DayItem {
   taskId: string | null
   /** Calendar source label for photo-imported events (e.g. "Kitchen", "Work"). */
   calendarTag: string | null
+  /** Optional local time as HH:MM (24h). */
+  time: string | null
   /** YYYY-MM-DD the item was first created. */
   createdOn: string
   /** YYYY-MM-DD it currently sits on; unfinished items roll forward. */

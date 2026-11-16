@@ -11,7 +11,7 @@ import SplashLogin from './SplashLogin.vue'
 import TaskView from './TaskView.vue'
 import { isDayIso, todayIso } from './day'
 import { activeDayPart, greetingFor, watchDayPart } from './dayPart'
-import { hrefFor, navigate, parseLocation, type AppRoute, type GoalTab } from './route'
+import { hrefFor, navigate, parseLocation, type AppRoute, type DaySpan, type GoalTab } from './route'
 import {
   addProject,
   addTask,
@@ -56,8 +56,14 @@ const overLane = ref<Lane | null>(null)
 const overTaskId = ref<string | null>(null)
 let taskWasDragged = false
 const capturing = ref(false)
-const view = ref<'home' | 'projects' | 'tasks' | 'goals' | 'day' | 'calendar' | 'progress' | 'settings'>('home')
+const view = ref<'home' | 'projects' | 'tasks' | 'goals' | 'calendar' | 'progress' | 'settings'>('home')
 const dayDate = ref(todayIso())
+const daySpan = ref<DaySpan>('day')
+const calendarSpans: { id: DaySpan; label: string }[] = [
+  { id: 'day', label: 'Day' },
+  { id: 'week', label: 'Week' },
+  { id: 'month', label: 'Month' },
+]
 const goalOpenId = ref<string | null>(null)
 const goalTab = ref<GoalTab>('journey')
 let ignoreRouteSync = false
@@ -98,8 +104,7 @@ const nav = [
   { id: 'projects', label: 'Projects', show: 'mobile' },
   { id: 'tasks', label: 'Tasks', show: 'always' },
   { id: 'goals', label: 'Goals', show: 'always' },
-  { id: 'day', label: 'Day', show: 'always' },
-  { id: 'calendar', label: 'Calendar', show: 'desktop' },
+  { id: 'calendar', label: 'Calendar', show: 'always' },
   { id: 'progress', label: 'Progress', show: 'always' },
   { id: 'settings', label: 'Settings', show: 'always' },
 ] as const
@@ -217,11 +222,19 @@ function routeFromState(): AppRoute {
       goalTab: goalOpenId.value ? goalTab.value : undefined,
     }
   }
-  if (view.value === 'day') {
+  if (view.value === 'calendar') {
     const today = todayIso()
-    return { name: 'day', date: dayDate.value !== today ? dayDate.value : undefined }
+    return {
+      name: 'calendar',
+      date:
+        daySpan.value === 'month'
+          ? undefined
+          : dayDate.value !== today || daySpan.value !== 'day'
+            ? dayDate.value
+            : undefined,
+      span: daySpan.value !== 'day' ? daySpan.value : undefined,
+    }
   }
-  if (view.value === 'calendar') return { name: 'calendar' }
   if (view.value === 'progress') return { name: 'progress' }
   return { name: 'settings' }
 }
@@ -275,15 +288,11 @@ function applyRoute(route: AppRoute) {
       goalTab.value = route.goalTab ?? 'journey'
       return
     }
-    if (route.name === 'day') {
-      view.value = 'day'
-      selectedId.value = null
-      dayDate.value = isDayIso(route.date) ? route.date : todayIso()
-      return
-    }
     if (route.name === 'calendar') {
       view.value = 'calendar'
       selectedId.value = null
+      dayDate.value = isDayIso(route.date) ? route.date : todayIso()
+      daySpan.value = route.span === 'week' || route.span === 'month' ? route.span : 'day'
       return
     }
     if (route.name === 'progress') {
@@ -301,7 +310,10 @@ function applyRoute(route: AppRoute) {
 function show(next: (typeof nav)[number]['id']) {
   view.value = next
   selectedId.value = null
-  if (next === 'day') dayDate.value = todayIso()
+  if (next === 'calendar') {
+    dayDate.value = todayIso()
+    daySpan.value = 'day'
+  }
   if (next !== 'goals') {
     goalOpenId.value = null
     goalTab.value = 'journey'
@@ -310,12 +322,17 @@ function show(next: (typeof nav)[number]['id']) {
   syncUrl('push')
 }
 
-function openDay(date: string) {
+function openCalendar(date: string, span: DaySpan = 'day') {
   dayDate.value = isDayIso(date) ? date : todayIso()
-  view.value = 'day'
+  daySpan.value = span
+  view.value = 'calendar'
   selectedId.value = null
   closeSide()
   syncUrl('push')
+}
+
+function setCalendarSpan(span: DaySpan) {
+  openCalendar(dayDate.value, span)
 }
 
 function navCurrent(id: (typeof nav)[number]['id']): boolean {
@@ -711,7 +728,6 @@ function laneLabel(lane: Lane) {
             <path v-if="item.id === 'home'" d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z" />
             <path v-else-if="item.id === 'projects'" d="M4 6.5A1.5 1.5 0 0 1 5.5 5h4.2l1.3 1.5H18.5A1.5 1.5 0 0 1 20 8v9.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z" />
             <path v-else-if="item.id === 'tasks'" d="M8 6h12M8 12h12M8 18h12M4.5 6h.01M4.5 12h.01M4.5 18h.01" />
-            <path v-else-if="item.id === 'day'" d="M12 7v5l3 2M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
             <path v-else-if="item.id === 'calendar'" d="M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
             <path v-else-if="item.id === 'goals'" d="M6 20V4m0 0h9l-2 3 2 3H6" />
             <path v-else-if="item.id === 'progress'" d="M4 16l5-5 3 3 7-8" />
@@ -803,8 +819,29 @@ function laneLabel(lane: Lane) {
         v-model:open-id="goalOpenId"
         v-model:detail-tab="goalTab"
       />
-      <DayView v-else-if="view === 'day'" :date="dayDate" />
-      <CalendarView v-else-if="view === 'calendar'" @open-day="openDay" />
+      <section v-else-if="view === 'calendar'" class="calendar-surface" aria-label="Calendar">
+        <div class="day-toolbar calendar-span-bar">
+          <p class="kicker calendar-span-kicker">Calendar</p>
+          <div class="lane-switch" role="group" aria-label="Calendar view">
+            <button
+              v-for="span in calendarSpans"
+              :key="span.id"
+              type="button"
+              :aria-pressed="daySpan === span.id"
+              @click="setCalendarSpan(span.id)"
+            >
+              {{ span.label }}
+            </button>
+          </div>
+        </div>
+        <DayView
+          v-if="daySpan !== 'month'"
+          :date="dayDate"
+          :span="daySpan"
+          @navigate="openCalendar($event.date, $event.span)"
+        />
+        <CalendarView v-else :focus-date="dayDate" @open-day="openCalendar($event, 'day')" />
+      </section>
       <ProgressView v-else-if="view === 'progress'" />
       <SettingsView v-else-if="view === 'settings'" />
       <section v-else-if="view === 'home'" aria-labelledby="charge-title">

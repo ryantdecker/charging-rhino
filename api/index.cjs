@@ -6730,6 +6730,16 @@ function todayIso(now = /* @__PURE__ */ new Date()) {
   const day = `${now.getDate()}`.padStart(2, "0");
   return `${now.getFullYear()}-${month}-${day}`;
 }
+function asTime(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(raw);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour > 23 || minute > 59) return null;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
 function rollDayItems(items, today = todayIso()) {
   const openPast = items.filter((item) => !item.done && item.plannedFor < today).sort((a, b) => a.plannedFor.localeCompare(b.plannedFor) || a.order - b.order);
   if (openPast.length === 0) return false;
@@ -6873,6 +6883,7 @@ function normalizeDayItem(raw, fallbackDay) {
     doneAt: raw.done === true ? raw.doneAt ?? null : null,
     taskId: raw.taskId ? String(raw.taskId) : null,
     calendarTag: calendarTagRaw || null,
+    time: asTime(raw.time),
     createdOn,
     plannedFor
   };
@@ -7071,6 +7082,7 @@ function makeDayItem(board, input) {
     doneAt: null,
     taskId,
     calendarTag: kind === "event" ? calendarTag : null,
+    time: asTime(input.time),
     createdOn: today,
     plannedFor
   };
@@ -7646,7 +7658,8 @@ ${block}` : block;
               kind: taskId ? "task" : kind,
               note: typeof body.note === "string" ? body.note : "",
               taskId,
-              plannedFor
+              plannedFor,
+              time: typeof body.time === "string" ? body.time : null
             })
           );
         })
@@ -7735,6 +7748,9 @@ ${block}` : block;
             if (typeof body.done === "boolean") {
               item.done = body.done;
               item.doneAt = body.done ? nowIso() : null;
+            }
+            if (body.time !== void 0) {
+              item.time = body.time === null || body.time === "" ? null : asTime(String(body.time));
             }
             if (body.plannedFor !== void 0) {
               const plannedFor = asDayIso(body.plannedFor, item.plannedFor);

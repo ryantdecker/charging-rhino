@@ -426,6 +426,7 @@ export function addDayItem(input: {
   note?: string
   taskId?: string | null
   plannedFor?: string | null
+  time?: string | null
 }): void {
   void commit('/api/day/items', { method: 'POST', body: input })
 }
@@ -513,6 +514,15 @@ export function renameDayItem(id: string, title: string): void {
   if (!item || !clean) return
   item.title = clean
   void commit(`/api/day/items/${id}`, { method: 'PATCH', body: { title: clean } })
+}
+
+export function setDayItemTime(id: string, time: string | null): void {
+  const item = board.dayItems.find((row) => row.id === id)
+  if (!item) return
+  const next = time && time.trim() ? time.trim() : null
+  if (item.time === next) return
+  item.time = next
+  void commit(`/api/day/items/${id}`, { method: 'PATCH', body: { time: next } })
 }
 
 export function removeDayItem(id: string): void {

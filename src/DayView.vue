@@ -1,6 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { dayItemsFor, formatDayLabel, isDayIso, todayIso } from './day'
+import {
+  asTime,
+  dayItemsFor,
+  formatDayHeading,
+  formatDayLabel,
+  formatTimeLabel,
+  formatWeekLabel,
+  isDayIso,
+  shiftDayIso,
+  todayIso,
+  weekDaysContaining,
+} from './day'
 import {
   addDayItem,
   addDayLines,
@@ -16,14 +27,21 @@ import {
   renameDayItem,
   setDayItemDate,
   setDayItemDone,
+  setDayItemTime,
 } from './store'
+import type { DaySpan } from './route'
 import { isActiveTask, type DayItem, type Task } from './types'
 
-const props = defineProps<{ date?: string }>()
+const props = withDefaults(defineProps<{ date?: string; span?: Exclude<DaySpan, 'month'> }>(), {
+  span: 'day',
+})
+const emit = defineEmits<{ navigate: [target: { date: string; span: DaySpan }] }>()
 
 const today = todayIso()
 const focusDate = computed(() => (isDayIso(props.date) ? props.date : today))
+const isWeek = computed(() => props.span === 'week')
 const draft = ref('')
+const draftTime = ref('')
 const pickingTask = ref(false)
 const capturing = ref(false)
 const reading = ref(false)
@@ -35,6 +53,7 @@ const calendarTagDraft = ref('')
 const editingId = ref<string | null>(null)
 const editTitle = ref('')
 const editDate = ref('')
+const editTime = ref('')
 const draggingId = ref<string | null>(null)
 const overId = ref<string | null>(null)
 let nextLineId = 1
@@ -49,6 +68,34 @@ const openAgenda = computed(() => agenda.value.filter((item) => !item.done))
 const doneAgenda = computed(() => agenda.value.filter((item) => item.done))
 const knownCalendars = computed(() => calendarTags())
 const isToday = computed(() => focusDate.value === today)
+const weekDays = computed(() =>
+  weekDaysContaining(focusDate.value).map((date) => {
+    const items = dayItemsFor(board.dayItems, date)
+    return {
+      date,
+      label: formatDayHeading(date),
+      isToday: date === today,
+      isFocus: date === focusDate.value,
+      open: items.filter((item) => !item.done),
+      done: items.filter((item) => item.done),
+    }
+  }),
+)
+
+function navigateTo(date: string, span: DaySpan = props.span) {
+  if (!isDayIso(date)) return
+  if (date === focusDate.value && span === props.span) return
+  emit('navigate', { date, span })
+}
+
+function shiftFocus(amount: number) {
+  navigateTo(shiftDayIso(focusDate.value, amount), props.span)
+}
+
+function onDateInput(event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  if (isDayIso(value)) navigateTo(value, props.span)
+}
 
 const pinnedTaskIds = computed(
   () => new Set(board.dayItems.filter((item) => item.kind === 'task' && item.taskId && !item.done).map((item) => item.taskId!)),
@@ -95,8 +142,10 @@ function kindLabel(item: DayItem): string {
 function addTodo() {
   const title = draft.value.trim()
   if (!title) return
+  const time = asTime(draftTime.value)
   draft.value = ''
-  addDayItem({ title, kind: 'todo', plannedFor: focusDate.value })
+  draftTime.value = ''
+  addDayItem({ title, kind: 'todo', plannedFor: focusDate.value, time })
 }
 
 function pinTask(task: Task) {
@@ -146,12 +195,14 @@ function openEdit(item: DayItem) {
   editingId.value = item.id
   editTitle.value = item.title
   editDate.value = item.plannedFor
+  editTime.value = item.time ?? ''
 }
 
 function closeEdit() {
   editingId.value = null
   editTitle.value = ''
   editDate.value = ''
+  editTime.value = ''
 }
 
 function saveEdit() {
@@ -163,6 +214,8 @@ function saveEdit() {
   if (editDate.value && editDate.value !== item.plannedFor) {
     setDayItemDate(item.id, editDate.value)
   }
+  const time = asTime(editTime.value)
+  if (time !== (item.time ?? null)) setDayItemTime(item.id, time)
   closeEdit()
 }
 
@@ -314,13 +367,14 @@ function openCapture() {
 
 <template>
   <section aria-labelledby="day-title">
-    <p class="kicker">Day plan</p>
     <div class="project-head">
       <div>
-        <h2 id="day-title" class="display">{{ formatDayLabel(focusDate) }}.</h2>
+        <h2 id="day-title" class="display">
+          {{ isWeek ? formatWeekLabel(focusDate) : `${formatDayLabel(focusDate)}.` }}
+        </h2>
         <p class="lede">
-          Quick todos, a few project tasks, and lines from a calendar photo
-          <template v-if="isToday"> — unfinished rolls forward</template>.
+          Quick todos, pinned tasks, and calendar lines
+          <template v-if="isToday && !isWeek"> — unfinished rolls forward</template>.
         </p>
       </div>
       <div class="actions">
@@ -331,13 +385,46 @@ function openCapture() {
       </div>
     </div>
 
+    <div class="day-toolbar">
+      <div class="day-nav" role="group" :aria-label="isWeek ? 'Week' : 'Day'">
+        <button class="texty" type="button" @click="shiftFocus(isWeek ? -7 : -1)">
+          {{ isWeek ? 'Previous week' : 'Previous' }}
+        </button>
+        <input
+          class="day-date-input"
+          type="date"
+          :value="focusDate"
+          :aria-label="isWeek ? 'Jump to week' : 'Jump to day'"
+          @change="onDateInput"
+        />
+        <button class="texty" type="button" @click="shiftFocus(isWeek ? 7 : 1)">
+          {{ isWeek ? 'Next week' : 'Next' }}
+        </button>
+        <button
+          v-if="!isToday || isWeek"
+          class="texty"
+          type="button"
+          @click="navigateTo(today, props.span)"
+        >
+          Today
+        </button>
+      </div>
+    </div>
+
     <form class="composer adder day-add" @submit.prevent="addTodo">
-      <input v-model="draft" aria-label="Quick todo" placeholder="Add a simple todo for today" />
+      <input
+        v-model="draft"
+        aria-label="Quick todo"
+        :placeholder="isWeek ? `Add to ${formatDayHeading(focusDate)}` : 'Add a simple todo for this day'"
+      />
+      <input v-model="draftTime" type="time" aria-label="Optional time" />
       <button class="solid" type="submit">Add</button>
     </form>
 
     <div v-if="pickingTask" class="day-pin-panel">
-      <p class="meta">Pin an open project task onto today. Checking it off here only clears the day plan.</p>
+      <p class="meta">
+        Pin an open project task onto {{ formatDayHeading(focusDate) }}. Checking it off here only clears the day plan.
+      </p>
       <p v-if="pinCandidates.length === 0" class="empty">Nothing left to pin, or everything useful is already here.</p>
       <button
         v-for="task in pinCandidates"
@@ -354,52 +441,110 @@ function openCapture() {
       </button>
     </div>
 
-    <div
-      class="day-agenda"
-      @dragover.prevent
-      @drop="onDropEnd"
-    >
-      <p v-if="openAgenda.length === 0" class="empty">Nothing planned yet. Add a todo, pin a task, or read a calendar photo.</p>
-      <article
-        v-for="item in openAgenda"
-        :key="item.id"
-        class="row day-item"
-        :class="{ dragging: draggingId === item.id, over: overId === item.id }"
-        draggable="true"
-        @dragstart="onDragStart(item.id, $event)"
-        @dragover.prevent="overId = item.id"
-        @drop.stop="onDrop(item.id)"
-        @dragend="clearDrag"
+    <div v-if="isWeek" class="week-stack">
+      <section
+        v-for="day in weekDays"
+        :key="day.date"
+        class="week-day"
+        :class="{ focus: day.isFocus, today: day.isToday }"
       >
-        <label class="day-check">
-          <input type="checkbox" :checked="item.done" @change="setDayItemDone(item.id, true)" />
-          <span class="visually-hidden">Done</span>
-        </label>
-        <div class="who">
-          <strong>{{ item.title }}</strong>
-          <p class="meta">
-            {{ kindLabel(item) }}
-            <template v-if="item.createdOn < focusDate"> · carried</template>
-          </p>
-        </div>
-        <button class="texty" type="button" @click.stop="openEdit(item)">Edit</button>
-      </article>
+        <header class="week-day-head">
+          <button class="week-day-open" type="button" @click="navigateTo(day.date, 'day')">
+            <strong>{{ day.label }}</strong>
+            <span class="meta">{{ day.open.length }} open</span>
+          </button>
+          <button
+            v-if="!day.isFocus"
+            class="texty"
+            type="button"
+            @click="navigateTo(day.date, 'week')"
+          >
+            Plan here
+          </button>
+        </header>
+        <p v-if="day.open.length === 0" class="empty week-empty">Clear.</p>
+        <article
+          v-for="item in day.open"
+          :key="item.id"
+          class="row day-item"
+          :class="{ dragging: draggingId === item.id, over: overId === item.id }"
+          draggable="true"
+          @dragstart="onDragStart(item.id, $event)"
+          @dragover.prevent="overId = item.id"
+          @drop.stop="onDrop(item.id)"
+          @dragend="clearDrag"
+        >
+          <label class="day-check">
+            <input type="checkbox" :checked="item.done" @change="setDayItemDone(item.id, true)" />
+            <span class="visually-hidden">Done</span>
+          </label>
+          <div class="who">
+            <strong>
+              <span v-if="item.time" class="day-time">{{ formatTimeLabel(item.time) }}</span>
+              {{ item.title }}
+            </strong>
+            <p class="meta">{{ kindLabel(item) }}</p>
+          </div>
+          <button class="texty" type="button" @click.stop="openEdit(item)">Edit</button>
+        </article>
+        <p v-if="day.done.length" class="meta week-done-meta">{{ day.done.length }} done</p>
+      </section>
     </div>
 
-    <div v-if="doneAgenda.length" class="day-done">
-      <h3>{{ isToday ? 'Done today' : 'Done' }}</h3>
-      <article v-for="item in doneAgenda" :key="item.id" class="row day-item done">
-        <label class="day-check">
-          <input type="checkbox" checked @change="setDayItemDone(item.id, false)" />
-          <span class="visually-hidden">Reopen</span>
-        </label>
-        <div class="who">
-          <strong>{{ item.title }}</strong>
-          <p class="meta">{{ kindLabel(item) }}</p>
-        </div>
-        <button class="texty" type="button" @click.stop="openEdit(item)">Edit</button>
-      </article>
-    </div>
+    <template v-else>
+      <div
+        class="day-agenda"
+        @dragover.prevent
+        @drop="onDropEnd"
+      >
+        <p v-if="openAgenda.length === 0" class="empty">Nothing planned yet. Add a todo, pin a task, or read a calendar photo.</p>
+        <article
+          v-for="item in openAgenda"
+          :key="item.id"
+          class="row day-item"
+          :class="{ dragging: draggingId === item.id, over: overId === item.id }"
+          draggable="true"
+          @dragstart="onDragStart(item.id, $event)"
+          @dragover.prevent="overId = item.id"
+          @drop.stop="onDrop(item.id)"
+          @dragend="clearDrag"
+        >
+          <label class="day-check">
+            <input type="checkbox" :checked="item.done" @change="setDayItemDone(item.id, true)" />
+            <span class="visually-hidden">Done</span>
+          </label>
+          <div class="who">
+            <strong>
+              <span v-if="item.time" class="day-time">{{ formatTimeLabel(item.time) }}</span>
+              {{ item.title }}
+            </strong>
+            <p class="meta">
+              {{ kindLabel(item) }}
+              <template v-if="item.createdOn < focusDate"> · carried</template>
+            </p>
+          </div>
+          <button class="texty" type="button" @click.stop="openEdit(item)">Edit</button>
+        </article>
+      </div>
+
+      <div v-if="doneAgenda.length" class="day-done">
+        <h3>{{ isToday ? 'Done today' : 'Done' }}</h3>
+        <article v-for="item in doneAgenda" :key="item.id" class="row day-item done">
+          <label class="day-check">
+            <input type="checkbox" checked @change="setDayItemDone(item.id, false)" />
+            <span class="visually-hidden">Reopen</span>
+          </label>
+          <div class="who">
+            <strong>
+              <span v-if="item.time" class="day-time">{{ formatTimeLabel(item.time) }}</span>
+              {{ item.title }}
+            </strong>
+            <p class="meta">{{ kindLabel(item) }}</p>
+          </div>
+          <button class="texty" type="button" @click.stop="openEdit(item)">Edit</button>
+        </article>
+      </div>
+    </template>
 
     <div v-if="editingItem" class="task-back" @click="onEditBack">
       <section class="task-sheet add-task-sheet" role="dialog" aria-labelledby="day-edit-title" @click.stop>
@@ -418,6 +563,10 @@ function openCapture() {
           <label class="field">
             <span>Day</span>
             <input v-model="editDate" type="date" aria-label="Assigned day" required />
+          </label>
+          <label class="field">
+            <span>Time</span>
+            <input v-model="editTime" type="time" aria-label="Optional time" />
           </label>
           <div class="task-sheet-actions">
             <button class="solid" type="submit">Save</button>

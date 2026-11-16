@@ -1,7 +1,7 @@
 import { createSeed } from '../src/seed.ts'
 import { guessAssist } from '../src/assist.ts'
 import type { Board, DayItem, DayItemKind, Horizon, Prefs, Task, TaskStatus } from '../src/types.ts'
-import { todayIso } from '../src/day.ts'
+import { asTime, todayIso } from '../src/day.ts'
 import { loadRawBoard, saveBoardIfRevision, saveRawBoard, storeKind } from './board-store.ts'
 
 export { dataFile } from './board-store.ts'
@@ -80,6 +80,7 @@ function normalizeDayItem(raw: Partial<DayItem> & { id?: string }, fallbackDay: 
     doneAt: raw.done === true ? (raw.doneAt ?? null) : null,
     taskId: raw.taskId ? String(raw.taskId) : null,
     calendarTag: calendarTagRaw || null,
+    time: asTime(raw.time),
     createdOn,
     plannedFor,
   }

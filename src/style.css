@@ -1532,6 +1532,74 @@ a.solid {
   .journey-scene { aspect-ratio: 4 / 3; }
 }
 
+.calendar-surface { display: grid; gap: 0; }
+.calendar-span-bar {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.calendar-span-kicker { margin: 0; }
+.day-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 16px;
+}
+.day-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+}
+.day-date-input {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+}
+.week-stack {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+.week-day {
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: grid;
+  gap: 8px;
+}
+.week-day.focus {
+  border-color: color-mix(in srgb, var(--charge) 45%, var(--line));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--charge) 25%, transparent);
+}
+.week-day.today .week-day-open strong { color: var(--charge); }
+.week-day-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.week-day-open {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  display: grid;
+  gap: 2px;
+}
+.week-day-open strong {
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+.week-empty { margin: 0; }
+.week-done-meta { margin: 2px 0 0; }
 .day-add { margin-top: 8px; }
 .day-pin-panel {
   margin: 14px 0 8px;
@@ -1580,6 +1648,18 @@ a.solid {
 }
 .day-item .who { flex: 1; min-width: 0; }
 .day-done { margin-top: 28px; }
+.day-time {
+  display: inline-block;
+  min-width: 4.5rem;
+  margin-right: 0.35rem;
+  color: var(--charge);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.day-add input[type='time'] {
+  width: auto;
+  min-width: 7.5rem;
+}
 .add-task-sheet .danger { color: #8d2f12; }
 .day-done h3 { margin: 0 0 10px; font-size: 1rem; }
 .day-preview {
