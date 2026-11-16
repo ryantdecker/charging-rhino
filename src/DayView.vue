@@ -28,6 +28,7 @@ import {
   setDayItemDate,
   setDayItemDone,
   setDayItemTime,
+  setTaskStatus,
 } from './store'
 import type { DaySpan } from './route'
 import { isActiveTask, type DayItem, type Task } from './types'
@@ -185,6 +186,21 @@ function onDropEnd() {
   clearDrag()
   if (!id) return
   placeDayItem(id, null)
+}
+
+function completeDayItem(item: DayItem) {
+  let completeTask = false
+  if (item.kind === 'task' && item.taskId) {
+    const task = board.tasks.find((row) => row.id === item.taskId)
+    const label = task?.title ?? item.title
+    if (task && task.status !== 'done') {
+      completeTask = window.confirm(
+        `“${label}” is pinned from a project.\n\nOK = mark that task done too\nCancel = leave the project task open`,
+      )
+    }
+  }
+  setDayItemDone(item.id, true)
+  if (completeTask && item.taskId) setTaskStatus(item.taskId, 'done')
 }
 
 function openEdit(item: DayItem) {
@@ -475,7 +491,7 @@ function openCapture() {
           @dragend="clearDrag"
         >
           <label class="day-check">
-            <input type="checkbox" :checked="item.done" @change="setDayItemDone(item.id, true)" />
+            <input type="checkbox" :checked="item.done" @change="completeDayItem(item)" />
             <span class="visually-hidden">Done</span>
           </label>
           <div class="who">
@@ -510,7 +526,7 @@ function openCapture() {
           @dragend="clearDrag"
         >
           <label class="day-check">
-            <input type="checkbox" :checked="item.done" @change="setDayItemDone(item.id, true)" />
+            <input type="checkbox" :checked="item.done" @change="completeDayItem(item)" />
             <span class="visually-hidden">Done</span>
           </label>
           <div class="who">

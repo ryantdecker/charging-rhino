@@ -61,12 +61,11 @@ export function formatWeekLabel(iso: string): string {
   const days = weekDaysContaining(iso)
   const start = parseDayIso(days[0])
   const end = parseDayIso(days[6])
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
   const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  const endLabel = end.toLocaleDateString('en-US', {
-    month: start.getMonth() === end.getMonth() ? undefined : 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
+  const endLabel = sameMonth
+    ? `${end.getDate()}, ${end.getFullYear()}`
+    : end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   return `${startLabel} – ${endLabel}`
 }
 
