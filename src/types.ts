@@ -77,10 +77,12 @@ export interface DayItem {
   calendarTag: string | null
   /** Optional local time as HH:MM (24h). */
   time: string | null
-  /** YYYY-MM-DD the item was first created. */
+  /** YYYY-MM-DD the item was first put on the plan (usually the original planned day). */
   createdOn: string
   /** YYYY-MM-DD it currently sits on; unfinished items roll forward. */
   plannedFor: string
+  /** Set when unfinished items roll forward from an earlier planned day. */
+  carriedFrom: string | null
 }
 
 export interface SyncReport {

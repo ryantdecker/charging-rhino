@@ -6756,6 +6756,7 @@ function rollDayItems(items, today = todayIso()) {
   if (openPast.length === 0) return false;
   const alreadyToday = items.filter((item) => item.plannedFor === today).sort((a, b) => a.order - b.order);
   openPast.forEach((item, index) => {
+    if (!item.carriedFrom) item.carriedFrom = item.plannedFor;
     item.plannedFor = today;
     item.order = index;
   });
@@ -6883,6 +6884,7 @@ function normalizeDayItem(raw, fallbackDay) {
   if (!id || !title) return null;
   const plannedFor = /^\d{4}-\d{2}-\d{2}$/.test(String(raw.plannedFor ?? "")) ? String(raw.plannedFor) : fallbackDay;
   const createdOn = /^\d{4}-\d{2}-\d{2}$/.test(String(raw.createdOn ?? "")) ? String(raw.createdOn) : plannedFor;
+  const carriedFrom = /^\d{4}-\d{2}-\d{2}$/.test(String(raw.carriedFrom ?? "")) ? String(raw.carriedFrom) : null;
   const calendarTagRaw = String(raw.calendarTag ?? "").trim().replace(/\s+/g, " ");
   return {
     id,
@@ -6896,7 +6898,8 @@ function normalizeDayItem(raw, fallbackDay) {
     calendarTag: calendarTagRaw || null,
     time: asTime(raw.time),
     createdOn,
-    plannedFor
+    plannedFor,
+    carriedFrom
   };
 }
 function normalize(board) {
@@ -7093,8 +7096,9 @@ function makeDayItem(board, input, today = todayIso()) {
     taskId,
     calendarTag: kind === "event" ? calendarTag : null,
     time: asTime(input.time),
-    createdOn: today,
-    plannedFor
+    createdOn: plannedFor,
+    plannedFor,
+    carriedFrom: null
   };
 }
 async function readyBoard() {
@@ -7770,6 +7774,8 @@ ${block}` : block;
               const plannedFor = asDayIso(body.plannedFor, item.plannedFor);
               if (plannedFor !== item.plannedFor) {
                 item.plannedFor = plannedFor;
+                item.createdOn = plannedFor;
+                item.carriedFrom = null;
                 const siblings = board.dayItems.filter(
                   (row) => row.plannedFor === plannedFor && row.id !== item.id
                 );

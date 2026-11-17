@@ -535,7 +535,7 @@ function applyCapture() {
             </strong>
             <p class="meta">
               {{ kindLabel(item) }}
-              <template v-if="item.createdOn < focusDate"> · carried</template>
+              <template v-if="item.carriedFrom"> · carried</template>
             </p>
           </div>
           <button class="texty" type="button" @click.stop="openEdit(item)">Edit</button>

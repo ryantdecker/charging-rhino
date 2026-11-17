@@ -504,6 +504,8 @@ export function setDayItemDate(id: string, plannedFor: string): void {
   const day = plannedFor.trim()
   if (!item || !/^\d{4}-\d{2}-\d{2}$/.test(day) || item.plannedFor === day) return
   item.plannedFor = day
+  item.createdOn = day
+  item.carriedFrom = null
   const siblings = board.dayItems.filter((row) => row.plannedFor === day && row.id !== id)
   const orders = siblings.map((row) => row.order)
   item.order = orders.length === 0 ? 0 : Math.max(...orders) + 1

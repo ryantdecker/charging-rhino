@@ -69,6 +69,9 @@ function normalizeDayItem(raw: Partial<DayItem> & { id?: string }, fallbackDay: 
   const createdOn = /^\d{4}-\d{2}-\d{2}$/.test(String(raw.createdOn ?? ''))
     ? String(raw.createdOn)
     : plannedFor
+  const carriedFrom = /^\d{4}-\d{2}-\d{2}$/.test(String(raw.carriedFrom ?? ''))
+    ? String(raw.carriedFrom)
+    : null
   const calendarTagRaw = String(raw.calendarTag ?? '').trim().replace(/\s+/g, ' ')
   return {
     id,
@@ -83,6 +86,7 @@ function normalizeDayItem(raw: Partial<DayItem> & { id?: string }, fallbackDay: 
     time: asTime(raw.time),
     createdOn,
     plannedFor,
+    carriedFrom,
   }
 }
 

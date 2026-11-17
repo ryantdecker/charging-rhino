@@ -1653,7 +1653,12 @@ a.solid {
   accent-color: var(--charge);
 }
 .day-item .who { flex: 1; min-width: 0; }
-.day-done { margin-top: 28px; }
+.day-done {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 28px;
+}
 .day-time {
   display: inline-block;
   min-width: 4.5rem;

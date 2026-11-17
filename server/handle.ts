@@ -78,8 +78,9 @@ function makeDayItem(
     taskId,
     calendarTag: kind === 'event' ? calendarTag : null,
     time: asTime(input.time),
-    createdOn: today,
+    createdOn: plannedFor,
     plannedFor,
+    carriedFrom: null,
   }
 }
 
@@ -812,6 +813,8 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
               const plannedFor = asDayIso(body.plannedFor, item.plannedFor)
               if (plannedFor !== item.plannedFor) {
                 item.plannedFor = plannedFor
+                item.createdOn = plannedFor
+                item.carriedFrom = null
                 const siblings = board.dayItems.filter(
                   (row) => row.plannedFor === plannedFor && row.id !== item.id,
                 )

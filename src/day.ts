@@ -112,6 +112,7 @@ export function rollDayItems(items: DayItem[], today = todayIso()): boolean {
 
   // Carried items keep relative order and sit ahead of items already on today.
   openPast.forEach((item, index) => {
+    if (!item.carriedFrom) item.carriedFrom = item.plannedFor
     item.plannedFor = today
     item.order = index
   })
