@@ -56,6 +56,7 @@ const editingId = ref<string | null>(null)
 const editTitle = ref('')
 const editDate = ref('')
 const editTime = ref('')
+const resolvingId = ref<string | null>(null)
 const draggingId = ref<string | null>(null)
 const overId = ref<string | null>(null)
 let nextLineId = 1
@@ -64,6 +65,14 @@ let itemWasDragged = false
 const editingItem = computed(
   () => board.dayItems.find((item) => item.id === editingId.value) ?? null,
 )
+const resolvingItem = computed(
+  () => board.dayItems.find((item) => item.id === resolvingId.value) ?? null,
+)
+const resolvingTask = computed(() => {
+  const item = resolvingItem.value
+  if (!item?.taskId) return null
+  return board.tasks.find((task) => task.id === item.taskId) ?? null
+})
 
 const agenda = computed(() => dayItemsFor(board.dayItems, focusDate.value))
 const openAgenda = computed(() => agenda.value.filter((item) => !item.done))
@@ -218,18 +227,31 @@ function onDropEnd() {
 }
 
 function completeDayItem(item: DayItem) {
-  let completeTask = false
   if (item.kind === 'task' && item.taskId) {
     const task = board.tasks.find((row) => row.id === item.taskId)
-    const label = task?.title ?? item.title
     if (task && task.status !== 'done') {
-      completeTask = window.confirm(
-        `“${label}” is pinned from a project.\n\nOK = mark that task done too\nCancel = leave the project task open`,
-      )
+      resolvingId.value = item.id
+      return
     }
   }
   setDayItemDone(item.id, true)
-  if (completeTask && item.taskId) setTaskStatus(item.taskId, 'done')
+}
+
+function closeResolve() {
+  resolvingId.value = null
+}
+
+function onResolveBack(event: MouseEvent) {
+  if (event.target === event.currentTarget) closeResolve()
+}
+
+function resolvePinned(completeTask: boolean) {
+  const item = resolvingItem.value
+  if (!item) return
+  const taskId = item.taskId
+  setDayItemDone(item.id, true)
+  if (completeTask && taskId) setTaskStatus(taskId, 'done')
+  closeResolve()
 }
 
 function openEdit(item: DayItem) {
@@ -538,6 +560,31 @@ function applyCapture() {
         </article>
       </div>
     </template>
+
+    <div v-if="resolvingItem" class="task-back" @click="onResolveBack">
+      <section
+        class="task-sheet add-task-sheet"
+        role="dialog"
+        aria-labelledby="day-resolve-title"
+        @click.stop
+      >
+        <header class="task-sheet-head">
+          <div>
+            <p class="kicker">{{ projectName(resolvingItem.taskId) || 'Pinned task' }}</p>
+            <h2 id="day-resolve-title" class="display">Clear from today?</h2>
+          </div>
+          <button class="texty" type="button" @click="closeResolve">Close</button>
+        </header>
+        <p class="lede">
+          “{{ resolvingTask?.title ?? resolvingItem.title }}” will leave the day plan.
+          Do you also want to mark the project task done?
+        </p>
+        <div class="task-sheet-actions resolve-actions">
+          <button class="solid" type="button" @click="resolvePinned(true)">Mark task done</button>
+          <button class="texty" type="button" @click="resolvePinned(false)">Leave task open</button>
+        </div>
+      </section>
+    </div>
 
     <div v-if="editingItem" class="task-back" @click="onEditBack">
       <section class="task-sheet add-task-sheet" role="dialog" aria-labelledby="day-edit-title" @click.stop>

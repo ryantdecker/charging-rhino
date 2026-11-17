@@ -6730,6 +6730,17 @@ function todayIso(now = /* @__PURE__ */ new Date()) {
   const day = `${now.getDate()}`.padStart(2, "0");
   return `${now.getFullYear()}-${month}-${day}`;
 }
+function isDayIso(value) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split("-").map(Number);
+  const date = new Date(y, (m ?? 1) - 1, d ?? 1);
+  return todayIso(date) === value;
+}
+function resolveToday(value, now = /* @__PURE__ */ new Date()) {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (isDayIso(raw)) return raw;
+  return todayIso(now);
+}
 function asTime(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
@@ -7055,8 +7066,7 @@ function asDayIso(value, fallback = todayIso()) {
   const iso = `${date.getFullYear()}-${month}-${day}`;
   return iso === raw ? raw : fallback;
 }
-function makeDayItem(board, input) {
-  const today = todayIso();
+function makeDayItem(board, input, today = todayIso()) {
   const plannedFor = asDayIso(input.plannedFor, today);
   const title = input.title.trim();
   if (!title) throw new Error("Name the item.");
@@ -7636,7 +7646,7 @@ ${block}` : block;
         res,
         200,
         await updateBoard((board) => {
-          rollDayItems(board.dayItems, todayIso());
+          rollDayItems(board.dayItems, resolveToday(body.today));
         })
       );
       return true;
@@ -7646,21 +7656,25 @@ ${block}` : block;
         res,
         200,
         await updateBoard((board) => {
-          const today = todayIso();
+          const today = resolveToday(body.today);
           rollDayItems(board.dayItems, today);
           const plannedFor = asDayIso(body.plannedFor, today);
           const kind = asDayKind2(body.kind);
           const taskId = typeof body.taskId === "string" ? body.taskId : null;
           const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : taskId ? board.tasks.find((item) => item.id === taskId)?.title ?? "" : "";
           board.dayItems.push(
-            makeDayItem(board, {
-              title,
-              kind: taskId ? "task" : kind,
-              note: typeof body.note === "string" ? body.note : "",
-              taskId,
-              plannedFor,
-              time: typeof body.time === "string" ? body.time : null
-            })
+            makeDayItem(
+              board,
+              {
+                title,
+                kind: taskId ? "task" : kind,
+                note: typeof body.note === "string" ? body.note : "",
+                taskId,
+                plannedFor,
+                time: typeof body.time === "string" ? body.time : null
+              },
+              today
+            )
           );
         })
       );
@@ -7671,7 +7685,7 @@ ${block}` : block;
         res,
         200,
         await updateBoard((board) => {
-          const today = todayIso();
+          const today = resolveToday(body.today);
           rollDayItems(board.dayItems, today);
           const plannedFor = asDayIso(body.plannedFor, today);
           const kind = asDayKind2(body.kind);
@@ -7697,7 +7711,7 @@ ${block}` : block;
           for (const line of lines) {
             if (kind === "event" && existingKeys.has(titleKey(line))) continue;
             board.dayItems.push(
-              makeDayItem(board, { title: line, kind, note: "", calendarTag, plannedFor })
+              makeDayItem(board, { title: line, kind, note: "", calendarTag, plannedFor }, today)
             );
             existingKeys.add(titleKey(line));
           }
@@ -7710,7 +7724,7 @@ ${block}` : block;
         res,
         200,
         await updateBoard((board) => {
-          const today = todayIso();
+          const today = resolveToday(body.today);
           rollDayItems(board.dayItems, today);
           const orderedIds = Array.isArray(body.orderedIds) ? body.orderedIds.map((id) => String(id)) : [];
           const open = board.dayItems.filter((item) => item.plannedFor === today && !item.done).sort((a, b) => a.order - b.order);
@@ -7782,18 +7796,18 @@ ${block}` : block;
           res,
           200,
           await updateBoard((board) => {
-            const today = todayIso();
+            const today = resolveToday(body.today);
             rollDayItems(board.dayItems, today);
             const item = board.dayItems.find((row) => row.id === itemId);
             if (!item || item.done) throw new Error("Unknown day item");
             const beforeId = typeof body.beforeId === "string" ? body.beforeId : null;
-            const siblings = board.dayItems.filter((row) => row.plannedFor === today && !row.done && row.id !== item.id).sort((a, b) => a.order - b.order);
+            const day = item.plannedFor;
+            const siblings = board.dayItems.filter((row) => row.plannedFor === day && !row.done && row.id !== item.id).sort((a, b) => a.order - b.order);
             const index = beforeId ? siblings.findIndex((row) => row.id === beforeId) : siblings.length;
             siblings.splice(index < 0 ? siblings.length : index, 0, item);
             siblings.forEach((row, order) => {
               row.order = order;
             });
-            item.plannedFor = today;
           })
         );
         return true;

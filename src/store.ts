@@ -1,4 +1,5 @@
 import { reactive, ref } from 'vue'
+import { todayIso } from './day'
 import type { Board, DayItem, DayItemKind, Goal, Horizon, Lane, Project, Task, TaskStatus } from './types'
 import { isActiveTask } from './types'
 
@@ -417,7 +418,7 @@ export function toggleMilestone(goalId: string, milestoneId: string): void {
 }
 
 export async function ensureDay(): Promise<void> {
-  await commit('/api/day/ensure', { method: 'POST' })
+  await commit('/api/day/ensure', { method: 'POST', body: { today: todayIso() } })
 }
 
 export function addDayItem(input: {
@@ -428,7 +429,7 @@ export function addDayItem(input: {
   plannedFor?: string | null
   time?: string | null
 }): void {
-  void commit('/api/day/items', { method: 'POST', body: input })
+  void commit('/api/day/items', { method: 'POST', body: { ...input, today: todayIso() } })
 }
 
 export function addDayLines(
@@ -448,6 +449,7 @@ export function addDayLines(
       calendarTag: options.calendarTag ?? null,
       removeMissing: options.removeMissing === true,
       plannedFor: options.plannedFor ?? null,
+      today: todayIso(),
     },
   })
 }
@@ -543,7 +545,7 @@ export function placeDayItem(id: string, beforeId: string | null): void {
   siblings.forEach((row, order) => {
     row.order = order
   })
-  void commit(`/api/day/items/${id}/place`, { method: 'POST', body: { beforeId } })
+  void commit(`/api/day/items/${id}/place`, { method: 'POST', body: { beforeId, today: todayIso() } })
 }
 
 export function dayItemById(id: string): DayItem | undefined {

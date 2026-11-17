@@ -1667,6 +1667,14 @@ a.solid {
   min-width: 7.5rem;
 }
 .add-task-sheet .danger { color: #8d2f12; }
+.resolve-actions {
+  flex-direction: column;
+  align-items: stretch;
+}
+.resolve-actions .solid,
+.resolve-actions .texty {
+  justify-content: center;
+}
 .day-done h3 { margin: 0 0 10px; font-size: 1rem; }
 .day-preview {
   width: 100%;

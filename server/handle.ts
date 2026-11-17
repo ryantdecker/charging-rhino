@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createSeed } from '../src/seed.ts'
 import { guessAssist } from '../src/assist.ts'
-import { asTime, rollDayItems, todayIso } from '../src/day.ts'
+import { asTime, resolveToday, rollDayItems, todayIso } from '../src/day.ts'
 import type { Board, DayItem, DayItemKind, Goal, Horizon, Lane, ProjectStatus } from '../src/types.ts'
 import { cleanTags, readBoard, updateBoard } from './document.ts'
 import { authEnabled, clearAuthCookie, isAuthorized, setAuthCookie } from './auth.ts'
@@ -50,8 +50,8 @@ function makeDayItem(
     plannedFor?: string | null
     time?: string | null
   },
+  today = todayIso(),
 ): DayItem {
-  const today = todayIso()
   const plannedFor = asDayIso(input.plannedFor, today)
   const title = input.title.trim()
   if (!title) throw new Error('Name the item.')
@@ -665,7 +665,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         res,
         200,
         await updateBoard((board) => {
-          rollDayItems(board.dayItems, todayIso())
+          rollDayItems(board.dayItems, resolveToday(body.today))
         }),
       )
       return true
@@ -676,7 +676,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         res,
         200,
         await updateBoard((board) => {
-          const today = todayIso()
+          const today = resolveToday(body.today)
           rollDayItems(board.dayItems, today)
           const plannedFor = asDayIso(body.plannedFor, today)
           const kind = asDayKind(body.kind)
@@ -688,14 +688,18 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
                 ? (board.tasks.find((item) => item.id === taskId)?.title ?? '')
                 : ''
           board.dayItems.push(
-            makeDayItem(board, {
-              title,
-              kind: taskId ? 'task' : kind,
-              note: typeof body.note === 'string' ? body.note : '',
-              taskId,
-              plannedFor,
-              time: typeof body.time === 'string' ? body.time : null,
-            }),
+            makeDayItem(
+              board,
+              {
+                title,
+                kind: taskId ? 'task' : kind,
+                note: typeof body.note === 'string' ? body.note : '',
+                taskId,
+                plannedFor,
+                time: typeof body.time === 'string' ? body.time : null,
+              },
+              today,
+            ),
           )
         }),
       )
@@ -707,7 +711,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         res,
         200,
         await updateBoard((board) => {
-          const today = todayIso()
+          const today = resolveToday(body.today)
           rollDayItems(board.dayItems, today)
           const plannedFor = asDayIso(body.plannedFor, today)
           const kind = asDayKind(body.kind)
@@ -743,7 +747,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
           for (const line of lines) {
             if (kind === 'event' && existingKeys.has(titleKey(line))) continue
             board.dayItems.push(
-              makeDayItem(board, { title: line, kind, note: '', calendarTag, plannedFor }),
+              makeDayItem(board, { title: line, kind, note: '', calendarTag, plannedFor }, today),
             )
             existingKeys.add(titleKey(line))
           }
@@ -757,7 +761,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         res,
         200,
         await updateBoard((board) => {
-          const today = todayIso()
+          const today = resolveToday(body.today)
           rollDayItems(board.dayItems, today)
           const orderedIds = Array.isArray(body.orderedIds)
             ? body.orderedIds.map((id) => String(id))
@@ -834,20 +838,20 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
           res,
           200,
           await updateBoard((board) => {
-            const today = todayIso()
+            const today = resolveToday(body.today)
             rollDayItems(board.dayItems, today)
             const item = board.dayItems.find((row) => row.id === itemId)
             if (!item || item.done) throw new Error('Unknown day item')
             const beforeId = typeof body.beforeId === 'string' ? body.beforeId : null
+            const day = item.plannedFor
             const siblings = board.dayItems
-              .filter((row) => row.plannedFor === today && !row.done && row.id !== item.id)
+              .filter((row) => row.plannedFor === day && !row.done && row.id !== item.id)
               .sort((a, b) => a.order - b.order)
             const index = beforeId ? siblings.findIndex((row) => row.id === beforeId) : siblings.length
             siblings.splice(index < 0 ? siblings.length : index, 0, item)
             siblings.forEach((row, order) => {
               row.order = order
             })
-            item.plannedFor = today
           }),
         )
         return true

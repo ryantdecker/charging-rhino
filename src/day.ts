@@ -14,6 +14,16 @@ export function isDayIso(value: string | null | undefined): value is string {
   return todayIso(date) === value
 }
 
+/**
+ * Prefer a client-supplied local calendar day (browsers are local; Vercel is UTC).
+ * Falls back to this runtime's local day when the value is missing or invalid.
+ */
+export function resolveToday(value: unknown, now = new Date()): string {
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (isDayIso(raw)) return raw
+  return todayIso(now)
+}
+
 /** Normalize to HH:MM or null. */
 export function asTime(value: string | null | undefined): string | null {
   const raw = String(value ?? '').trim()
