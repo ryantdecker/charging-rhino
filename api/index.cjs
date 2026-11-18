@@ -6920,6 +6920,8 @@ function normalize(board) {
     const score = Number(task3.assist);
     if (!Number.isInteger(score) || score < 1 || score > 10) task3.assist = guessAssist(task3.title, task3.note);
     task3.status = migrateTaskStatus(task3);
+    const minutes = Number(task3.minutes);
+    task3.minutes = task3.minutes != null && Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : null;
     delete task3.done;
     task3.startedAt = task3.startedAt ?? null;
     task3.startRef = task3.startRef ?? null;
@@ -7142,6 +7144,7 @@ function compactTask(item) {
     lane: item.lane,
     status: item.status,
     assist: item.assist,
+    minutes: item.minutes ?? null,
     startedAt: item.startedAt,
     doneAt: item.doneAt,
     startRef: item.startRef,
@@ -7376,6 +7379,13 @@ ${block}` : block;
             }
             if (typeof body.assist === "number" && Number.isFinite(body.assist)) {
               item.assist = Math.min(10, Math.max(1, Math.round(body.assist)));
+              touched = true;
+            }
+            if (body.minutes === null) {
+              item.minutes = null;
+              touched = true;
+            } else if (typeof body.minutes === "number" && Number.isFinite(body.minutes) && body.minutes > 0) {
+              item.minutes = Math.round(body.minutes);
               touched = true;
             }
             if (touched) {

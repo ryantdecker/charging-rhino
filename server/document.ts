@@ -110,6 +110,8 @@ export function normalize(board: Board): Board {
     const score = Number(task.assist)
     if (!Number.isInteger(score) || score < 1 || score > 10) task.assist = guessAssist(task.title, task.note)
     task.status = migrateTaskStatus(task)
+    const minutes = Number(task.minutes)
+    task.minutes = task.minutes != null && Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : null
     delete task.done
     task.startedAt = task.startedAt ?? null
     task.startRef = task.startRef ?? null

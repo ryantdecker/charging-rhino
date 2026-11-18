@@ -253,6 +253,17 @@ export function setAssist(id: string, assist: number): void {
   void commit(`/api/tasks/${id}`, { method: 'PATCH', body: { assist: score } })
 }
 
+/** Set the hands-on estimate in minutes; this is what marks a task as triaged. Null clears it. */
+export function setMinutes(id: string, minutes: number | null): void {
+  const task = board.tasks.find((item) => item.id === id)
+  const value = minutes != null && Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : null
+  if (task) {
+    task.minutes = value
+    touchLocal(task)
+  }
+  void commit(`/api/tasks/${id}`, { method: 'PATCH', body: { minutes: value } })
+}
+
 function laneSiblings(projectId: string, lane: Lane, exceptId?: string): Task[] {
   return board.tasks
     .filter((task) => {

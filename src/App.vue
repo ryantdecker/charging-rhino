@@ -9,7 +9,9 @@ import ProgressView from './ProgressView.vue'
 import SettingsView from './SettingsView.vue'
 import SplashLogin from './SplashLogin.vue'
 import TaskView from './TaskView.vue'
+import TriageFilter from './TriageFilter.vue'
 import { isDayIso, todayIso } from './day'
+import { isQuick, isTriaged, matchesTriage, triageCounts, type TriageFilter as TriageMode } from './triage'
 import { activeDayPart, greetingFor, watchDayPart } from './dayPart'
 import { hrefFor, navigate, parseLocation, type AppRoute, type DaySpan, type GoalTab } from './route'
 import {
@@ -49,6 +51,7 @@ const taskLane = ref<Lane>('now')
 const addingTask = ref(false)
 const showDone = ref(false)
 const projectFilter = ref('')
+const triageFilter = ref<TriageMode>('all')
 const editingTaskId = ref<string | null>(null)
 const draggingId = ref<string | null>(null)
 const draggingTaskId = ref<string | null>(null)
@@ -182,9 +185,22 @@ const greeting = computed(() => greetingFor(activeDayPart.value))
 const lanes: Lane[] = ['now', 'next', 'later']
 
 function matchesProjectFilter(task: Task): boolean {
+  if (!matchesTriage(task, triageFilter.value)) return false
   const q = projectFilter.value.trim().toLowerCase()
   if (!q) return true
   return task.title.toLowerCase().includes(q) || (task.note ?? '').toLowerCase().includes(q)
+}
+
+const projectTriageCounts = computed(() =>
+  selectedId.value ? triageCounts(tasksFor(selectedId.value)) : { all: 0, quick: 0, agent: 0 },
+)
+
+const filtering = computed(() => triageFilter.value !== 'all' || projectFilter.value.trim() !== '')
+
+function emptyFilterCopy(): string {
+  if (triageFilter.value === 'all') return 'No matches.'
+  const kind = triageFilter.value === 'quick' ? 'Quick' : 'Agent'
+  return `No ${kind} tasks here. Run /triage-tasks to sort them.`
 }
 
 function laneTasks(projectId: string, lane: Lane): Task[] {
@@ -341,12 +357,17 @@ function navCurrent(id: (typeof nav)[number]['id']): boolean {
   return view.value === id
 }
 
+const nowTriageCounts = computed(() => triageCounts(nowQueue()))
+
+// Rank stays the task's place in the full Now queue, even when filtered.
 const chargeNow = computed(() =>
-  nowQueue().map((task, index) => ({
-    task,
-    index,
-    project: projectById(task.projectId),
-  })),
+  nowQueue()
+    .map((task, index) => ({
+      task,
+      index,
+      project: projectById(task.projectId),
+    }))
+    .filter((row) => matchesTriage(row.task, triageFilter.value)),
 )
 
 function onNowDrop(beforeId: string) {
@@ -906,7 +927,11 @@ function laneLabel(lane: Lane) {
             </div>
             <div v-if="charge[0].top" class="horn-marks">
               <span class="chip" :class="charge[0].top.lane">{{ laneLabel(charge[0].top.lane) }}</span>
+              <span v-if="isQuick(charge[0].top)" class="chip quick-chip">
+                Quick · {{ charge[0].top.minutes }}m
+              </span>
               <span
+                v-if="isTriaged(charge[0].top)"
                 class="chip assist-chip"
                 :title="`Agent ${charge[0].top.assist}: 1 is a person, 10 is ready to hand to an agent`"
               >
@@ -970,6 +995,9 @@ function laneLabel(lane: Lane) {
           <h2 id="tasks-title" class="display">Now.</h2>
         </div>
         <p class="lede">Drag to set charge priority across every open project.</p>
+        <div class="project-filters">
+          <TriageFilter v-model="triageFilter" :counts="nowTriageCounts" />
+        </div>
         <div
           class="now-queue"
           :class="{ over: overLane === 'now' }"
@@ -977,7 +1005,9 @@ function laneLabel(lane: Lane) {
           @dragleave="onLaneLeave('now', $event)"
           @drop="onNowDropEnd"
         >
-          <p v-if="chargeNow.length === 0" class="empty">Nothing in Now. Promote a task from a project.</p>
+          <p v-if="chargeNow.length === 0" class="empty">
+            {{ triageFilter === 'all' ? 'Nothing in Now. Promote a task from a project.' : emptyFilterCopy() }}
+          </p>
           <article
             v-for="row in chargeNow"
             :key="row.task.id"
@@ -1000,6 +1030,8 @@ function laneLabel(lane: Lane) {
               <p class="meta">
                 {{ row.project?.name ?? 'Unknown project' }}
                 <template v-if="row.task.status === 'in_progress'"> · in progress</template>
+                <template v-if="isQuick(row.task)"> · quick, {{ row.task.minutes }} min</template>
+                <template v-if="isTriaged(row.task)"> · agent {{ row.task.assist }}</template>
               </p>
               <p v-if="row.task.note" class="note">{{ row.task.note }}</p>
             </div>
@@ -1179,13 +1211,14 @@ function laneLabel(lane: Lane) {
           </div>
         </div>
 
-        <div class="project-filters">
+        <div class="project-filters project-filter-row">
           <input
             v-model="projectFilter"
             type="search"
             aria-label="Filter tasks"
             placeholder="Filter tasks"
           />
+          <TriageFilter v-model="triageFilter" :counts="projectTriageCounts" />
         </div>
 
         <div class="lanes">
@@ -1203,7 +1236,9 @@ function laneLabel(lane: Lane) {
               {{ laneLabel(lane) }}
               <span>{{ laneTasks(selected.id, lane).length }}</span>
             </h3>
-            <p v-if="laneTasks(selected.id, lane).length === 0" class="empty">Drop a card here.</p>
+            <p v-if="laneTasks(selected.id, lane).length === 0" class="empty">
+              {{ filtering ? emptyFilterCopy() : 'Drop a card here.' }}
+            </p>
             <article
               v-for="task in laneTasks(selected.id, lane)"
               :key="task.id"
@@ -1224,7 +1259,10 @@ function laneLabel(lane: Lane) {
               <p v-if="task.note" class="note">{{ task.note }}</p>
               <div class="task-marks">
                 <span v-if="task.status === 'in_progress'" class="chip">In progress</span>
-                <span class="chip assist-chip" title="Agent readiness">Agent {{ task.assist ?? 5 }}</span>
+                <span v-if="isQuick(task)" class="chip quick-chip" :title="`About ${task.minutes} minutes`">
+                  Quick · {{ task.minutes }}m
+                </span>
+                <span v-if="isTriaged(task)" class="chip assist-chip" title="Agent readiness">Agent {{ task.assist }}</span>
                 <span class="source">{{ task.source }}</span>
               </div>
             </article>

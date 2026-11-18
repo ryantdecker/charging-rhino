@@ -1,6 +1,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { board, removeTask, renameTask, setAssist, setLane, setNote, setTaskRef, setTaskStatus } from './store'
+import {
+  board,
+  removeTask,
+  renameTask,
+  setAssist,
+  setLane,
+  setMinutes,
+  setNote,
+  setTaskRef,
+  setTaskStatus,
+} from './store'
+import { QUICK_MAX_MINUTES, isTriaged } from './triage'
 import type { Lane, TaskStatus } from './types'
 
 const props = defineProps<{ taskId: string }>()
@@ -11,6 +22,7 @@ const title = ref('')
 const note = ref('')
 const startRef = ref('')
 const doneRef = ref('')
+const minutesDraft = ref('')
 
 const task = computed(() => board.tasks.find((item) => item.id === props.taskId) ?? null)
 const project = computed(() => board.projects.find((item) => item.id === task.value?.projectId) ?? null)
@@ -26,9 +38,16 @@ watch(
     note.value = item.note ?? ''
     startRef.value = item.startRef ?? ''
     doneRef.value = item.doneRef ?? ''
+    minutesDraft.value = item.minutes ? String(item.minutes) : ''
   },
   { immediate: true },
 )
+
+function saveMinutes() {
+  if (!task.value) return
+  const raw = minutesDraft.value.trim()
+  setMinutes(task.value.id, raw ? Number(raw) : null)
+}
 
 function laneLabel(lane: Lane) {
   if (lane === 'now') return 'Now'
@@ -166,6 +185,21 @@ function onBack(event: MouseEvent) {
         />
       </label>
 
+      <label class="field">
+        <span>Time estimate (minutes)</span>
+        <input
+          v-model="minutesDraft"
+          type="number"
+          min="1"
+          step="5"
+          inputmode="numeric"
+          aria-label="Time estimate in minutes"
+          :placeholder="`${QUICK_MAX_MINUTES} or less counts as Quick`"
+          @change="saveMinutes"
+        />
+        <p class="meta">Setting this marks the task as triaged, which shows its Agent score and enables the Quick and Agent filters.</p>
+      </label>
+
       <label class="field assist-field">
         <span>Agent readiness</span>
         <div class="assist">
@@ -181,7 +215,10 @@ function onBack(event: MouseEvent) {
           />
           <strong>{{ task.assist ?? 5 }}</strong>
         </div>
-        <p class="meta">1 is a person · 10 is ready for an agent</p>
+        <p class="meta">
+          1 is a person · 10 is ready for an agent
+          <template v-if="!isTriaged(task)"> · unconfirmed guess until triaged</template>
+        </p>
       </label>
 
       <p class="meta source-line">

@@ -452,6 +452,14 @@ h2.display {
 .chip.next { background: rgba(0, 140, 255, 0.12); color: var(--blue); }
 .chip.later { background: rgba(94, 86, 76, 0.12); color: var(--ink-soft); }
 .chip.assist-chip { background: rgba(0, 140, 255, 0.12); color: var(--blue); }
+.chip.quick-chip { background: rgba(255, 122, 0, 0.14); color: #b4540a; }
+.project-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+.triage-filter button { padding: 5px 11px; font-size: 0.82rem; }
 .horn-marks { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 .assist {
   display: flex;

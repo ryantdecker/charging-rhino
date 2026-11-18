@@ -44,6 +44,8 @@ export interface Task {
   originKey: string | null
   sourceChecked: boolean
   assist: number
+  /** Triage estimate in minutes of hands-on work. Null until triaged; 20 or less counts as quick. */
+  minutes?: number | null
 }
 
 export interface Milestone {

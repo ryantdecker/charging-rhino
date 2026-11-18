@@ -135,6 +135,7 @@ function compactTask(item: Board['tasks'][number]) {
     lane: item.lane,
     status: item.status,
     assist: item.assist,
+    minutes: item.minutes ?? null,
     startedAt: item.startedAt,
     doneAt: item.doneAt,
     startRef: item.startRef,
@@ -384,6 +385,13 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
             }
             if (typeof body.assist === 'number' && Number.isFinite(body.assist)) {
               item.assist = Math.min(10, Math.max(1, Math.round(body.assist)))
+              touched = true
+            }
+            if (body.minutes === null) {
+              item.minutes = null
+              touched = true
+            } else if (typeof body.minutes === 'number' && Number.isFinite(body.minutes) && body.minutes > 0) {
+              item.minutes = Math.round(body.minutes)
               touched = true
             }
             if (touched) {
